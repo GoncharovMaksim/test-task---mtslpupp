@@ -124,15 +124,29 @@ npm run dev
 ```
 Open `http://localhost:3000` to access the Gateway Control Plane.
 
-### 2. Standalone Telegram Polling Worker
+### 2. 24/7 Vercel Serverless Webhook (Production Mode)
+In production, the bot operates continuously 24/7 without requiring a local machine:
+```bash
+# Check current Webhook status
+npm run webhook:info
+
+# Register or re-point webhook to Vercel deployment
+npm run webhook:set
+
+# Remove webhook for offline/testing mode
+npm run webhook:delete
+```
+
+### 3. Standalone Telegram Polling Worker (Local Dev Mode)
 To run the Telegram bot adapter in continuous polling mode via application-level proxy:
 ```bash
 npm run bot
 # or
 npm run bot:polling
 ```
+> Note: If the Vercel Webhook is active, the polling worker automatically detects it, pauses the webhook during the local session, and restores 24/7 production operation upon graceful termination.
 
-### 3. Docker & Docker Compose
+### 4. Docker & Docker Compose
 ```bash
 # Build and launch container
 docker compose up -d --build

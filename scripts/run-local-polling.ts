@@ -6,7 +6,7 @@ async function main() {
 
   if (!me.ok) {
     console.error('Failed to connect to Telegram Bot API:', me.description);
-    console.log('Ensure SOCKS5 proxy or TELEGRAM_BOT_TOKEN is properly configured.');
+    console.log('Ensure proxy or TELEGRAM_BOT_TOKEN is properly configured.');
     process.exit(1);
   }
 
@@ -18,20 +18,46 @@ async function main() {
   const diagnostics = await container.testConnectivityUseCase.execute();
   console.log('Telegram API status:', diagnostics.telegramStatus.status, `(${diagnostics.telegramStatus.latencyMs}ms)`);
   console.log('LLM Provider status:', diagnostics.llmStatus.status, `(${diagnostics.llmStatus.latencyMs}ms)`);
-  console.log('Gateway is listening for incoming updates. Press Ctrl+C to terminate.');
+
+  // Webhook collision detection and automatic fallback management
+  const webhookInfo = await container.telegramAdapter.getWebhookInfo();
+  let productionWebhookUrl: string | undefined;
+
+  if (webhookInfo.ok && webhookInfo.result?.url) {
+    productionWebhookUrl = webhookInfo.result.url;
+    console.log(`\n[Notice] Telegram Webhook is currently active pointing to: ${productionWebhookUrl}`);
+    console.log('[Notice] In normal mode, the bot already processes messages 24/7 on Vercel without a local machine.');
+    console.log('[Switch] Temporarily unregistering webhook to allow local polling session...');
+    await container.telegramAdapter.deleteWebhook();
+    console.log('[Switch] Webhook paused. Polling worker active.');
+  }
+
+  console.log('Gateway is listening for incoming updates. Press Ctrl+C to terminate.\n');
 
   let offset = 0;
   let isRunning = true;
 
-  process.on('SIGINT', () => {
-    console.log('\nReceived SIGINT. Shutting down gracefully...');
+  const shutdown = async () => {
+    if (!isRunning) return;
     isRunning = false;
-  });
+    console.log('\nShutting down polling worker gracefully...');
 
-  process.on('SIGTERM', () => {
-    console.log('\nReceived SIGTERM. Shutting down gracefully...');
-    isRunning = false;
-  });
+    if (productionWebhookUrl) {
+      console.log(`[Restore] Re-activating 24/7 production webhook on Vercel: ${productionWebhookUrl}`);
+      try {
+        await container.telegramAdapter.setWebhook(productionWebhookUrl);
+        console.log('[Restore] Production webhook successfully restored.');
+      } catch (err: any) {
+        console.error('[Restore Error] Failed to restore webhook:', err?.message);
+      }
+    }
+
+    console.log('OpenClaw polling worker terminated.');
+    process.exit(0);
+  };
+
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
 
   while (isRunning) {
     try {
@@ -59,9 +85,6 @@ async function main() {
       }
     }
   }
-
-  console.log('OpenClaw polling worker terminated.');
-  process.exit(0);
 }
 
 main().catch((err) => {

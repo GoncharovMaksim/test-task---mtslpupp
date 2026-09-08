@@ -11,7 +11,10 @@
     "test": "jest --passWithNoTests",
     "test:coverage": "jest --coverage",
     "bot": "ts-node -T -r dotenv/config -O '{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' scripts/run-local-polling.ts",
-    "bot:polling": "ts-node -T -r dotenv/config -O '{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' scripts/run-local-polling.ts"
+    "bot:polling": "ts-node -T -r dotenv/config -O '{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' scripts/run-local-polling.ts",
+    "webhook:set": "ts-node -T -r dotenv/config -O '{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' scripts/manage-webhook.ts set",
+    "webhook:info": "ts-node -T -r dotenv/config -O '{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' scripts/manage-webhook.ts info",
+    "webhook:delete": "ts-node -T -r dotenv/config -O '{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' scripts/manage-webhook.ts delete"
   },
   "dependencies": {
     "dotenv": "^16.4.7",

@@ -21,6 +21,10 @@ export class TelegramBotAdapter implements IMessengerAdapter {
     return this.callApi('getMe', {});
   }
 
+  public async getWebhookInfo(): Promise<{ ok: boolean; result?: any; description?: string }> {
+    return this.callApi('getWebhookInfo', {});
+  }
+
   public async setWebhook(url: string, secretToken?: string): Promise<boolean> {
     const payload: Record<string, any> = { url };
     if (secretToken) {
