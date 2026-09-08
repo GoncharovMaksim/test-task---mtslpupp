@@ -1,7 +1,7 @@
 # OpenClaw Gateway
 
 ## Live Demo
-https://test-task-mtslpupp.vercel.app
+https://test-task-vibecoder-mtslpupp.vercel.app
 
 ## Overview
 OpenClaw Gateway is a self-hosted AI assistant service built on TypeScript and Clean Architecture principles. It bridges messaging channels (Telegram Bot) and web interfaces with high-speed LLM inference providers.
