@@ -2,6 +2,7 @@ import { MessageEntity } from '../../domain/entities/message.entity';
 import { ILLMProvider } from '../../domain/interfaces/llm-provider.interface';
 import { ISessionRepository } from '../../domain/interfaces/session-repository.interface';
 import { ISoulRepository } from '../../domain/interfaces/soul-repository.interface';
+import { TelegramFormatService } from '../../../infrastructure/services/telegram-format.service';
 
 export interface ProcessChatMessageRequest {
   sessionId: string;
@@ -62,9 +63,13 @@ export class ProcessChatMessageUseCase {
       systemInstruction,
     });
 
+    const finalContent = request.channel === 'telegram'
+      ? TelegramFormatService.sanitize(completion.content)
+      : completion.content;
+
     const assistantMessage = new MessageEntity({
       role: 'assistant',
-      content: completion.content,
+      content: finalContent,
       metadata: {
         tokensUsed: completion.tokensUsed?.totalTokens,
         provider: completion.provider,

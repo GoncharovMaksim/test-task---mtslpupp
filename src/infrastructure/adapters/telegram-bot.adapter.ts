@@ -3,6 +3,7 @@ import {
   OutgoingMessagePayload,
 } from '../../core/domain/interfaces/messenger-adapter.interface';
 import { proxyFetch } from '../services/proxy-http-client';
+import { TelegramFormatService } from '../services/telegram-format.service';
 
 export class TelegramBotAdapter implements IMessengerAdapter {
   public readonly channelName = 'telegram';
@@ -49,9 +50,10 @@ export class TelegramBotAdapter implements IMessengerAdapter {
   }
 
   public async sendMessage(payload: OutgoingMessagePayload): Promise<boolean> {
+    const text = TelegramFormatService.sanitize(payload.text);
     const body: Record<string, any> = {
       chat_id: payload.chatId,
-      text: payload.text,
+      text,
     };
 
     if (payload.replyToMessageId) {
