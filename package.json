@@ -10,7 +10,8 @@
     "lint": "next lint",
     "test": "jest --passWithNoTests",
     "test:coverage": "jest --coverage",
-    "bot:polling": "ts-node -r dotenv/config -O '{\"module\":\"commonjs\"}' scripts/run-local-polling.ts"
+    "bot": "ts-node -T -r dotenv/config -O '{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' scripts/run-local-polling.ts",
+    "bot:polling": "ts-node -T -r dotenv/config -O '{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' scripts/run-local-polling.ts"
   },
   "dependencies": {
     "dotenv": "^16.4.7",

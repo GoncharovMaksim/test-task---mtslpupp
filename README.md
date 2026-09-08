@@ -125,8 +125,10 @@ npm run dev
 Open `http://localhost:3000` to access the Gateway Control Plane.
 
 ### 2. Standalone Telegram Polling Worker
-To run the Telegram bot adapter in continuous polling mode via SOCKS5 proxy:
+To run the Telegram bot adapter in continuous polling mode via application-level proxy:
 ```bash
+npm run bot
+# or
 npm run bot:polling
 ```
 
@@ -197,6 +199,8 @@ Snapshots:   0 total
 
 ## Google Form Submission Data
 
+- Название проекта: **OpenClaw Enterprise Gateway**
+- Имя бота: **OpenClaw AI Assistant**
 - Username Telegram-бота: `@dp_openclawmtslpu_wltsg_bot`
 - Краткое текстовое описание: Для стабильной работы из РФ без необходимости включать системный VPN реализована прикладная модель маршрутизации (Application-level proxying): как вызовы к Telegram Bot API, так и запросы к зарубежным AI-провайдерам (Groq, OpenRouter) туннелируются через изолированный HTTP CONNECT / SOCKS5 прокси-агент. Системные интерфейсы ОС не затрагиваются. Зарегистрирован персональный Telegram-бот проекта, вынесены выделенные песочные ключи ИИ, оформлен системный профиль SOUL.md и подготовлен Docker Compose.
 - Время выполнения: 3.5 часа

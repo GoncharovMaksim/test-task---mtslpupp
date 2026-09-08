@@ -38,7 +38,19 @@ async function main() {
       const updates = await container.telegramAdapter.getUpdates(offset, 20);
       for (const update of updates) {
         offset = update.update_id + 1;
-        await container.handleTelegramUpdateUseCase.execute(update);
+        const msg = update.message;
+        if (msg?.text) {
+          const userTag = msg.from?.username ? `@${msg.from.username}` : `ID:${msg.from?.id || msg.chat.id}`;
+          console.log(`[${new Date().toLocaleTimeString()}] [Incoming #${update.update_id}] from ${userTag} (chat ${msg.chat.id}): "${msg.text}"`);
+          const result = await container.handleTelegramUpdateUseCase.execute(update);
+          if (result.handled) {
+            console.log(`[${new Date().toLocaleTimeString()}] [Handled #${update.update_id}] Action: ${result.action}`);
+          } else if (result.error) {
+            console.error(`[${new Date().toLocaleTimeString()}] [Error #${update.update_id}]: ${result.error}`);
+          }
+        } else {
+          await container.handleTelegramUpdateUseCase.execute(update);
+        }
       }
     } catch (err: any) {
       if (isRunning) {

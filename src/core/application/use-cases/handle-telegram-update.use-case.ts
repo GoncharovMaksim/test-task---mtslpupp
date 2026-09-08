@@ -123,7 +123,7 @@ export class HandleTelegramUpdateUseCase {
       const statusText =
         `Gateway Status:\n` +
         `- Runtime: Node.js (OpenClaw Clean Architecture)\n` +
-        `- Channel: Telegram Bot (@HanterProBot)\n` +
+        `- Assistant: OpenClaw AI Assistant\n` +
         `- Active sessions: ${activeCount}\n` +
         `- Memory compaction: enabled (3500 token ceiling)\n` +
         `- Proxy bypass: verified active`;
