@@ -71,6 +71,8 @@ src/
 - Containerization: Docker (multi-stage), Docker Compose
 - UI: React 18, Tailwind CSS, Lucide Icons
 
+Подробный разбор архитектуры и принципов работы доступен в [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md).
+
 ## Russia No-VPN Bypass Implementation (Stage 2)
 
 Russian ISPs frequently throttle or block direct connections to `api.telegram.org` and selected foreign AI platforms. To solve this without requiring a system-level VPN, the gateway implements two distinct operational paths:
