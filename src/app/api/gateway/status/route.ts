@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { container } from '@/infrastructure/container';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const status = await container.getGatewayStatusUseCase.execute();

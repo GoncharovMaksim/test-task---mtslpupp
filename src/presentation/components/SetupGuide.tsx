@@ -3,7 +3,11 @@
 import React, { useState } from 'react';
 import { Copy, Check, Terminal, ExternalLink, HelpCircle } from 'lucide-react';
 
-export const SetupGuide: React.FC = () => {
+interface SetupGuideProps {
+  botUsername?: string;
+}
+
+export const SetupGuide: React.FC<SetupGuideProps> = ({ botUsername }) => {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const copyToClipboard = (text: string, key: string) => {
@@ -12,8 +16,13 @@ export const SetupGuide: React.FC = () => {
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
+  const resolvedBotUsername =
+    botUsername ||
+    process.env.NEXT_PUBLIC_BOT_USERNAME ||
+    '@dp_openclawmtslpu_wltsg_bot';
+
   const formAnswers = {
-    botUsername: '@HanterProBot',
+    botUsername: resolvedBotUsername,
     solutionDescription:
       'Для обеспечения работы из РФ без системного VPN реализованы два взаимодополняющих механизма: 1) В продакшене шлюз развернут на Vercel Edge/Serverless, куда Telegram доставляет вебхуки напрямую без блокировок РКН; 2) Для локального запуска реализован TelegramBotAdapter с поддержкой SOCKS5-агента и альтернативных реверс-прокси (Cloudflare Workers), а в качестве LLM-провайдера задействован Groq API (Qwen 3.8 / LLaMA 3.3), который работает нативно с субсекундной задержкой. Дополнительно написан кастомный SOUL.md и настроен Docker Compose.',
     timeSpent: '3.5 часа',
@@ -71,8 +80,17 @@ export const SetupGuide: React.FC = () => {
                 <span className="text-[11px] font-mono">{copiedKey === 'bot' ? 'Copied' : 'Copy'}</span>
               </button>
             </div>
-            <div className="p-2.5 bg-zinc-900 border border-zinc-800 rounded font-mono text-xs text-zinc-200">
-              {formAnswers.botUsername}
+            <div className="p-2.5 bg-zinc-900 border border-zinc-800 rounded font-mono text-xs text-zinc-200 flex items-center justify-between">
+              <span>{formAnswers.botUsername}</span>
+              <a
+                href={`https://t.me/${formAnswers.botUsername.replace('@', '')}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-emerald-400 hover:text-emerald-300 flex items-center space-x-1 font-sans text-xs"
+              >
+                <span>Открыть в Telegram</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
             </div>
           </div>
 

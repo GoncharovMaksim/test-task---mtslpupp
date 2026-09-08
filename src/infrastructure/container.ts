@@ -60,7 +60,8 @@ class Container {
 
   public readonly getGatewayStatusUseCase = new GetGatewayStatusUseCase(
     this.sessionRepository,
-    this.soulRepository
+    this.soulRepository,
+    process.env.TELEGRAM_BOT_USERNAME || process.env.NEXT_PUBLIC_BOT_USERNAME || '@dp_openclawmtslpu_wltsg_bot'
   );
 
   public static getInstance(): Container {

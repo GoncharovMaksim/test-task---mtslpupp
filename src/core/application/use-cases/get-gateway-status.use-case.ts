@@ -9,6 +9,7 @@ export interface GatewayStatusResponse {
   activeSessions: number;
   soulName: string;
   memoryUsageMb: number;
+  botUsername: string;
   features: {
     telegramBot: boolean;
     proxyBypass: boolean;
@@ -22,7 +23,8 @@ export class GetGatewayStatusUseCase {
 
   constructor(
     private readonly sessionRepository: ISessionRepository,
-    private readonly soulRepository: ISoulRepository
+    private readonly soulRepository: ISoulRepository,
+    private readonly botUsername?: string
   ) {}
 
   public async execute(): Promise<GatewayStatusResponse> {
@@ -38,6 +40,11 @@ export class GetGatewayStatusUseCase {
       activeSessions,
       soulName: soul.metadata.name,
       memoryUsageMb: Math.round((memory.heapUsed / 1024 / 1024) * 10) / 10,
+      botUsername:
+        this.botUsername ||
+        process.env.TELEGRAM_BOT_USERNAME ||
+        process.env.NEXT_PUBLIC_BOT_USERNAME ||
+        '@dp_openclawmtslpu_wltsg_bot',
       features: {
         telegramBot: true,
         proxyBypass: true,
