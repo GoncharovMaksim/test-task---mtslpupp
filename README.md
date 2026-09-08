@@ -71,7 +71,7 @@ src/
 - Containerization: Docker (multi-stage), Docker Compose
 - UI: React 18, Tailwind CSS, Lucide Icons
 
-Подробный разбор архитектуры и принципов работы доступен в [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md).
+Подробный разбор архитектуры и принципов работы доступен в [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md). Спецификация и концепция автономного агента OpenClaw описаны в [docs/OPENCLAW.md](./docs/OPENCLAW.md).
 
 ## Russia No-VPN Bypass Implementation (Stage 2)
 
