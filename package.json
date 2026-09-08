@@ -10,15 +10,17 @@
     "lint": "next lint",
     "test": "jest --passWithNoTests",
     "test:coverage": "jest --coverage",
-    "bot:polling": "ts-node -r dotenv/config scripts/run-local-polling.ts"
+    "bot:polling": "ts-node -r dotenv/config -O '{\"module\":\"commonjs\"}' scripts/run-local-polling.ts"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
+    "https-proxy-agent": "^7.0.5",
     "lucide-react": "^0.475.0",
     "next": "^14.2.24",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "socks-proxy-agent": "^8.0.5"
+    "socks-proxy-agent": "^8.0.5",
+    "undici": "^8.10.2"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",

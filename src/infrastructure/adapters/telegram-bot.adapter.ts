@@ -1,28 +1,21 @@
-import { SocksProxyAgent } from 'socks-proxy-agent';
 import {
   IMessengerAdapter,
   OutgoingMessagePayload,
 } from '../../core/domain/interfaces/messenger-adapter.interface';
+import { proxyFetch } from '../services/proxy-http-client';
 
 export class TelegramBotAdapter implements IMessengerAdapter {
   public readonly channelName = 'telegram';
   private readonly baseUrl: string;
-  private socksAgent?: SocksProxyAgent;
 
   constructor(
     private readonly botToken: string,
-    proxyUrl?: string,
+    private readonly proxyUrl?: string,
     apiBase: string = 'https://api.telegram.org'
   ) {
     this.baseUrl = `${apiBase.replace(/\/$/, '')}/bot${botToken}`;
-    if (proxyUrl && proxyUrl.startsWith('socks')) {
-      try {
-        this.socksAgent = new SocksProxyAgent(proxyUrl);
-      } catch {
-        this.socksAgent = undefined;
-      }
-    }
   }
+
 
   public async getMe(): Promise<{ ok: boolean; result?: any; description?: string }> {
     return this.callApi('getMe', {});
@@ -86,19 +79,14 @@ export class TelegramBotAdapter implements IMessengerAdapter {
     const timeoutSeconds = method === 'getUpdates' && data.timeout ? data.timeout + 5 : 15;
     const timer = setTimeout(() => controller.abort(), timeoutSeconds * 1000);
 
-    const fetchOptions: any = {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-      signal: controller.signal,
-    };
-
-    if (this.socksAgent) {
-      fetchOptions.agent = this.socksAgent;
-    }
-
     try {
-      const res = await fetch(`${this.baseUrl}/${method}`, fetchOptions);
+      const res = await proxyFetch(`${this.baseUrl}/${method}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+        signal: controller.signal,
+        proxyUrl: this.proxyUrl,
+      });
       clearTimeout(timer);
       return await res.json();
     } catch (err: any) {
@@ -110,3 +98,4 @@ export class TelegramBotAdapter implements IMessengerAdapter {
     }
   }
 }
+

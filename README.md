@@ -183,21 +183,21 @@ curl -s -X POST http://localhost:3000/api/telegram/webhook \
 
 ## Test Suite
 
-Tests cover all domain entities, parser services, network routers, and application use cases:
+Tests cover all domain entities, parser services, network routers, proxy tunnels, and application use cases:
 ```bash
 npm test
 ```
 
 Results:
 ```
-Test Suites: 7 passed, 7 total
-Tests:       19 passed, 19 total
+Test Suites: 8 passed, 8 total
+Tests:       21 passed, 21 total
 Snapshots:   0 total
-Time:        3.79 s
 ```
 
 ## Google Form Submission Data
 
-- Username Telegram-бота: `@HanterProBot`
-- Краткое текстовое описание: Для стабильной работы из РФ без включения системного VPN реализованы два параллельных механизма: облачный вебхук на Vercel Serverless (трафик доставляется напрямую в международный ЦОД) и локальный Telegram-адаптер с поддержкой SOCKS5-агента и альтернативных реверс-прокси. В качестве LLM-провайдера используется Groq Cloud (Qwen 3.8 / LLaMA 3.3), доступный напрямую с минимальной задержкой. Дополнительно составлен SOUL.md с правилами безопасности и настроен Docker Compose.
+- Username Telegram-бота: `@dp_openclawmtslpu_wltsg_bot`
+- Краткое текстовое описание: Для стабильной работы из РФ без необходимости включать системный VPN реализована прикладная модель маршрутизации (Application-level proxying): как вызовы к Telegram Bot API, так и запросы к зарубежным AI-провайдерам (Groq, OpenRouter) туннелируются через изолированный HTTP CONNECT / SOCKS5 прокси-агент. Системные интерфейсы ОС не затрагиваются. Зарегистрирован персональный Telegram-бот проекта, вынесены выделенные песочные ключи ИИ, оформлен системный профиль SOUL.md и подготовлен Docker Compose.
 - Время выполнения: 3.5 часа
+

@@ -4,6 +4,7 @@ import {
   CompletionResult,
   ILLMProvider,
 } from '../../core/domain/interfaces/llm-provider.interface';
+import { proxyFetch } from '../services/proxy-http-client';
 
 export class GroqLLMAdapter implements ILLMProvider {
   public readonly providerName = 'groq';
@@ -11,8 +12,10 @@ export class GroqLLMAdapter implements ILLMProvider {
   constructor(
     private readonly apiKey: string,
     private readonly defaultModel: string = 'qwen/qwen3.8-27b',
-    private readonly baseUrl: string = 'https://api.groq.com/openai/v1'
+    private readonly baseUrl: string = 'https://api.groq.com/openai/v1',
+    private readonly proxyUrl?: string
   ) {}
+
 
   public async complete(
     messages: MessageEntity[],
@@ -51,7 +54,7 @@ export class GroqLLMAdapter implements ILLMProvider {
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     try {
-      const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      const response = await proxyFetch(`${this.baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -59,6 +62,7 @@ export class GroqLLMAdapter implements ILLMProvider {
         },
         body: JSON.stringify(payload),
         signal: controller.signal,
+        proxyUrl: this.proxyUrl,
       });
 
       clearTimeout(timeoutId);
@@ -99,8 +103,9 @@ export class GroqLLMAdapter implements ILLMProvider {
   public async testConnection(): Promise<{ ok: boolean; latencyMs: number; error?: string }> {
     const startTime = Date.now();
     try {
-      const response = await fetch(`${this.baseUrl}/models`, {
+      const response = await proxyFetch(`${this.baseUrl}/models`, {
         headers: { Authorization: `Bearer ${this.apiKey}` },
+        proxyUrl: this.proxyUrl,
       });
       return {
         ok: response.ok,
@@ -116,3 +121,4 @@ export class GroqLLMAdapter implements ILLMProvider {
     }
   }
 }
+

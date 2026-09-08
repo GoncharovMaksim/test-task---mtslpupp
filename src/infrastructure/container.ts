@@ -20,7 +20,9 @@ class Container {
 
   public readonly llmProvider = new GroqLLMAdapter(
     this.config.llm.groqApiKey,
-    this.config.llm.groqModel
+    this.config.llm.groqModel,
+    'https://api.groq.com/openai/v1',
+    this.config.llm.proxyUrl || this.config.proxyUrl
   );
 
   public readonly telegramAdapter = new TelegramBotAdapter(
