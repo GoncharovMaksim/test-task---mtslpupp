@@ -43,7 +43,7 @@ export class GroqLLMAdapter implements ILLMProvider {
       model,
       messages: formattedMessages,
       temperature: options?.temperature ?? 0.7,
-      max_tokens: options?.maxTokens ?? 1024,
+      max_tokens: options?.maxTokens ?? 512,
     };
 
     const startTime = Date.now();
