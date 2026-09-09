@@ -85,29 +85,7 @@ const AVAILABLE_MODELS: ModelOption[] = [
 const DEFAULT_MODEL = 'qwen/qwen3.8-27b';
 const STORAGE_KEY_CHATS = 'claw_ai_chats_v2';
 const STORAGE_KEY_ACTIVE_ID = 'claw_ai_active_chat_id_v2';
-
-const QUICK_PROMPTS = [
-  {
-    title: 'Помощь с кодом',
-    desc: 'Написать функцию, исправить баг или разобрать архитектуру',
-    prompt: 'Помоги написать чистый и производительный код. Какие лучшие практики применить?',
-  },
-  {
-    title: 'Объяснить сложную тему',
-    desc: 'Понятно и структурированно с простыми примерами',
-    prompt: 'Объясни простыми словами, как работают современные большие языковые модели (LLM).',
-  },
-  {
-    title: 'Редактирование текста',
-    desc: 'Улучшить стиль, убрать воду и выделить главное',
-    prompt: 'Помоги структурировать и улучшить следующий текст, сделав его лаконичным и четким.',
-  },
-  {
-    title: 'Идеи и мозговой штурм',
-    desc: 'Сгенерировать гипотезы и нестандартные варианты',
-    prompt: 'Предложи 5 нестандартных идей для нового веб-сервиса с высокой ценностью для пользователей.',
-  },
-];
+const BOT_GREETING = 'Привет! Чем я могу помочь?';
 
 export const CommercialChatApp: React.FC = () => {
   const [chats, setChats] = useState<ChatConversation[]>([]);
@@ -136,13 +114,28 @@ export const CommercialChatApp: React.FC = () => {
         if (saved) {
           const parsed: ChatConversation[] = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setChats(parsed);
+            const sanitized = parsed.map((c) =>
+              c.messages && c.messages.length > 0
+                ? c
+                : {
+                    ...c,
+                    messages: [
+                      {
+                        id: `msg_asst_${c.id}`,
+                        role: 'assistant' as const,
+                        content: BOT_GREETING,
+                        timestamp: c.createdAt || Date.now(),
+                      },
+                    ],
+                  }
+            );
+            setChats(sanitized);
             const initialActive =
-              savedActive && parsed.some((c) => c.id === savedActive)
+              savedActive && sanitized.some((c) => c.id === savedActive)
                 ? savedActive
-                : parsed[0].id;
+                : sanitized[0].id;
             setActiveChatId(initialActive);
-            const active = parsed.find((c) => c.id === initialActive);
+            const active = sanitized.find((c) => c.id === initialActive);
             if (active) setSelectedModel(active.model || DEFAULT_MODEL);
             return;
           }
@@ -158,7 +151,14 @@ export const CommercialChatApp: React.FC = () => {
         createdAt: Date.now(),
         updatedAt: Date.now(),
         model: DEFAULT_MODEL,
-        messages: [],
+        messages: [
+          {
+            id: `msg_asst_${Date.now()}`,
+            role: 'assistant',
+            content: BOT_GREETING,
+            timestamp: Date.now(),
+          },
+        ],
       };
       setChats([initialChat]);
       setActiveChatId(initialChatId);
@@ -221,7 +221,14 @@ export const CommercialChatApp: React.FC = () => {
       createdAt: Date.now(),
       updatedAt: Date.now(),
       model: selectedModel,
-      messages: [],
+      messages: [
+        {
+          id: `msg_asst_${Date.now()}`,
+          role: 'assistant',
+          content: BOT_GREETING,
+          timestamp: Date.now(),
+        },
+      ],
     };
     setChats((prev) => [newChat, ...prev]);
     setActiveChatId(newId);
@@ -254,7 +261,14 @@ export const CommercialChatApp: React.FC = () => {
         createdAt: Date.now(),
         updatedAt: Date.now(),
         model: selectedModel,
-        messages: [],
+        messages: [
+          {
+            id: `msg_asst_${Date.now()}`,
+            role: 'assistant',
+            content: BOT_GREETING,
+            timestamp: Date.now(),
+          },
+        ],
       };
       setChats([fallbackChat]);
       setActiveChatId(fallbackId);
@@ -288,8 +302,10 @@ export const CommercialChatApp: React.FC = () => {
       timestamp: Date.now(),
     };
 
-    const isFirstMessage = !currentChat || currentChat.messages.length === 0;
-    const newTitle = isFirstMessage
+    const isFirstUserMessage =
+      !currentChat ||
+      currentChat.messages.filter((m) => m.role === 'user').length === 0;
+    const newTitle = isFirstUserMessage
       ? text.slice(0, 32) + (text.length > 32 ? '...' : '')
       : currentChat?.title || 'Диалог';
 
@@ -298,11 +314,22 @@ export const CommercialChatApp: React.FC = () => {
     setChats((prev) =>
       prev.map((c) => {
         if (c.id === targetChatId) {
+          const baseMessages =
+            c.messages.length === 0
+              ? [
+                  {
+                    id: `msg_asst_${c.id}`,
+                    role: 'assistant' as const,
+                    content: BOT_GREETING,
+                    timestamp: c.createdAt,
+                  },
+                ]
+              : c.messages;
           return {
             ...c,
             title: newTitle,
             updatedAt: Date.now(),
-            messages: [...c.messages, userMessage],
+            messages: [...baseMessages, userMessage],
           };
         }
         return c;
@@ -566,109 +593,86 @@ export const CommercialChatApp: React.FC = () => {
 
         {/* Message Stream Viewport */}
         <div className="flex-1 overflow-y-auto px-4 py-4 md:px-8 space-y-6">
-          {(!currentChat || currentChat.messages.length === 0) ? (
-            /* Empty Chat State (ChatGPT Style Hero) */
-            <div className="max-w-2xl mx-auto h-full flex flex-col items-center justify-center text-center py-12 space-y-8">
-              <div className="space-y-2">
-                <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-zinc-100">
-                  Чем я могу помочь?
-                </h1>
-                <p className="text-xs sm:text-sm text-zinc-400">
-                  Выберите тему для начала или задайте любой вопрос ниже.
-                </p>
-              </div>
-
-              {/* Starter Prompt Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full max-w-xl text-left">
-                {QUICK_PROMPTS.map((item, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => handleSendMessage(item.prompt)}
-                    className="p-3.5 rounded-xl bg-zinc-800/40 hover:bg-zinc-800/80 border border-zinc-800 hover:border-zinc-700 text-left transition-all active:scale-[0.99] group"
-                  >
-                    <div className="text-xs font-semibold text-zinc-200 group-hover:text-white transition-colors">
-                      {item.title}
-                    </div>
-                    <div className="text-[11px] text-zinc-400 mt-0.5 line-clamp-2 leading-relaxed">
-                      {item.desc}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            /* Messages Stream */
-            <div className="max-w-3xl mx-auto space-y-6">
-              {currentChat.messages.map((msg) => {
-                const isUser = msg.role === 'user';
-                return (
+          <div className="max-w-3xl mx-auto space-y-6 pt-2 pb-4">
+            {(currentChat?.messages && currentChat.messages.length > 0
+              ? currentChat.messages
+              : [
+                  {
+                    id: `msg_asst_${currentChat?.id || 'init'}`,
+                    role: 'assistant' as const,
+                    content: BOT_GREETING,
+                    timestamp: currentChat?.createdAt || Date.now(),
+                  },
+                ]
+            ).map((msg) => {
+              const isUser = msg.role === 'user';
+              return (
+                <div
+                  key={msg.id}
+                  className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
+                >
                   <div
-                    key={msg.id}
-                    className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
+                    className={`relative max-w-[90%] sm:max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                      isUser
+                        ? 'bg-[#2f2f2f] text-white rounded-br-sm'
+                        : 'bg-transparent text-zinc-200 pl-0'
+                    }`}
                   >
-                    <div
-                      className={`relative max-w-[90%] sm:max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                        isUser
-                          ? 'bg-[#2f2f2f] text-white rounded-br-sm'
-                          : 'bg-transparent text-zinc-200 pl-0'
-                      }`}
-                    >
-                      <div className="whitespace-pre-wrap font-sans break-words selection:bg-zinc-700">
-                        {msg.content}
-                      </div>
-
-                      {/* Assistant Info & Copy Button */}
-                      {!isUser && (
-                        <div className="mt-2 flex items-center space-x-3 text-[11px] text-zinc-500 font-mono">
-                          {msg.latencyMs !== undefined && (
-                            <span className="flex items-center space-x-1">
-                              <Clock className="w-3 h-3 text-zinc-500" />
-                              <span>{msg.latencyMs}ms</span>
-                            </span>
-                          )}
-                          {msg.tokensUsed !== undefined && (
-                            <span className="flex items-center space-x-1">
-                              <Zap className="w-3 h-3 text-zinc-500" />
-                              <span>{msg.tokensUsed} токенов</span>
-                            </span>
-                          )}
-
-                          <button
-                            onClick={() => handleCopyContent(msg.content, msg.id)}
-                            className="flex items-center space-x-1 text-zinc-500 hover:text-zinc-300 transition-colors p-1 rounded"
-                            title="Скопировать ответ"
-                          >
-                            {copiedMessageId === msg.id ? (
-                              <>
-                                <Check className="w-3 h-3 text-emerald-400" />
-                                <span className="text-emerald-400">Скопировано</span>
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="w-3 h-3" />
-                                <span>Копировать</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      )}
+                    <div className="whitespace-pre-wrap font-sans break-words selection:bg-zinc-700">
+                      {msg.content}
                     </div>
+
+                    {/* Assistant Info & Copy Button */}
+                    {!isUser && (
+                      <div className="mt-2 flex items-center space-x-3 text-[11px] text-zinc-500 font-mono">
+                        {msg.latencyMs !== undefined && (
+                          <span className="flex items-center space-x-1">
+                            <Clock className="w-3 h-3 text-zinc-500" />
+                            <span>{msg.latencyMs}ms</span>
+                          </span>
+                        )}
+                        {msg.tokensUsed !== undefined && (
+                          <span className="flex items-center space-x-1">
+                            <Zap className="w-3 h-3 text-zinc-500" />
+                            <span>{msg.tokensUsed} токенов</span>
+                          </span>
+                        )}
+
+                        <button
+                          onClick={() => handleCopyContent(msg.content, msg.id)}
+                          className="flex items-center space-x-1 text-zinc-500 hover:text-zinc-300 transition-colors p-1 rounded"
+                          title="Скопировать ответ"
+                        >
+                          {copiedMessageId === msg.id ? (
+                            <>
+                              <Check className="w-3 h-3 text-emerald-400" />
+                              <span className="text-emerald-400">Скопировано</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3 h-3" />
+                              <span>Копировать</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </div>
-                );
-              })}
-
-              {/* Typing / Loading Indicator */}
-              {isLoading && (
-                <div className="flex items-center space-x-1.5 py-2 pl-1">
-                  <span className="w-2 h-2 rounded-full bg-zinc-400 animate-pulse" />
-                  <span className="w-2 h-2 rounded-full bg-zinc-400 animate-pulse delay-150" />
-                  <span className="w-2 h-2 rounded-full bg-zinc-400 animate-pulse delay-300" />
                 </div>
-              )}
+              );
+            })}
 
-              <div ref={messagesEndRef} />
-            </div>
-          )}
+            {/* Typing / Loading Indicator */}
+            {isLoading && (
+              <div className="flex items-center space-x-1.5 py-2 pl-1">
+                <span className="w-2 h-2 rounded-full bg-zinc-400 animate-pulse" />
+                <span className="w-2 h-2 rounded-full bg-zinc-400 animate-pulse delay-150" />
+                <span className="w-2 h-2 rounded-full bg-zinc-400 animate-pulse delay-300" />
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
         </div>
 
         {/* Bottom Input Area (ChatGPT Style) */}
