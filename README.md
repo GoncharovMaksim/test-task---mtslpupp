@@ -1,7 +1,18 @@
 # OpenClaw Gateway
 
 ## Live Demo
-https://test-task-vibecoder-mtslpupp.vercel.app
+- Веб-приложение и коммерческий чат: https://test-task-vibecoder-mtslpupp.vercel.app
+- Панель шлюза и мониторинга: https://test-task-vibecoder-mtslpupp.vercel.app/gateway
+
+## Мобильное приложение на Android
+Приложение работает на Android в двух режимах:
+1. **Быстрая установка PWA (Рекомендуется, без скачивания тяжелых APK)**:
+   - Откройте https://test-task-vibecoder-mtslpupp.vercel.app в браузере Chrome / Яндекс на Android-смартфоне.
+   - Нажмите кнопку **«Установить на Android»** в боковом меню приложения (или в меню браузера выберите *«Установить приложение»* / *«Добавить на главный экран»*).
+   - Приложение установится на рабочий стол телефона с отдельной иконкой, полноэкранным режимом без рамок браузера и локальным кэшированием.
+2. **Сборка нативного APK (WebView)**:
+   - Исходный код нативного Android-проекта находится в директории [`android/`](./android).
+   - Откройте папку в Android Studio и выберите `Build -> Build APK(s)`.
 
 ## Overview
 OpenClaw Gateway is a self-hosted AI assistant service built on TypeScript and Clean Architecture principles. It bridges messaging channels (Telegram Bot) and web interfaces with high-speed LLM inference providers.
