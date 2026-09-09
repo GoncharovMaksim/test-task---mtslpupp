@@ -4,7 +4,7 @@ import { container } from '@/infrastructure/container';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { content, sessionId = 'web_session_default', userId = 'web_user' } = body;
+    const { content, sessionId = 'web_session_default', userId = 'web_user', model } = body;
 
     if (!content || typeof content !== 'string') {
       return NextResponse.json({ error: 'content is required and must be a string' }, { status: 400 });
@@ -15,6 +15,7 @@ export async function POST(req: NextRequest) {
       userId,
       content,
       channel: 'web',
+      model,
     });
 
     return NextResponse.json({

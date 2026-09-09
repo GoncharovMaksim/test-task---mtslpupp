@@ -1,5 +1,5 @@
-import { GatewayDashboard } from '@/presentation/components/GatewayDashboard';
+import { CommercialChatApp } from '@/presentation/components/CommercialChatApp';
 
 export default function HomePage() {
-  return <GatewayDashboard />;
+  return <CommercialChatApp />;
 }

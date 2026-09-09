@@ -10,6 +10,7 @@ export interface ProcessChatMessageRequest {
   content: string;
   channel?: 'telegram' | 'web';
   metadata?: Record<string, any>;
+  model?: string;
 }
 
 export interface ProcessChatMessageResponse {
@@ -61,6 +62,7 @@ export class ProcessChatMessageUseCase {
 
     const completion = await this.llmProvider.complete(contextMessages, {
       systemInstruction,
+      model: request.model,
     });
 
     const finalContent = request.channel === 'telegram'

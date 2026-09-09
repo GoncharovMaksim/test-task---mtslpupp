@@ -62,4 +62,19 @@ describe('ProcessChatMessageUseCase', () => {
     expect(session.messages[0].content).toBe('What is OpenClaw?');
     expect(session.messages[1].role).toBe('assistant');
   });
+
+  it('should forward custom model parameter to llmProvider when specified', async () => {
+    await useCase.execute({
+      sessionId: 'session_model_test',
+      content: 'Hello with custom model',
+      model: 'llama-3.3-70b-versatile',
+    });
+
+    expect(mockLLMProvider.complete).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.objectContaining({
+        model: 'llama-3.3-70b-versatile',
+      })
+    );
+  });
 });
