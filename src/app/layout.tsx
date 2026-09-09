@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Claw AI — Commercial AI Assistant',
-  description: 'Fast, secure conversational AI assistant with multi-chat support, model switching, and Android PWA installation.',
+  title: 'Claw AI',
+  description: 'Умный ИИ-чат с выбором моделей и историей диалогов.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
