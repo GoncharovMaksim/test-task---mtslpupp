@@ -19,7 +19,9 @@ import {
   ExternalLink,
   ShieldCheck,
   Zap,
-  RotateCcw
+  RotateCcw,
+  AlertCircle,
+  Share2
 } from 'lucide-react';
 
 interface ChatMessage {
@@ -128,6 +130,10 @@ export const CommercialChatApp: React.FC = () => {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [isStandalone, setIsStandalone] = useState(false);
   const [installSuccess, setInstallSuccess] = useState(false);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const [isBannerDismissed, setIsBannerDismissed] = useState(false);
+  const [isInAppBrowser, setIsInAppBrowser] = useState(false);
+  const [isAppleDevice, setIsAppleDevice] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -135,13 +141,22 @@ export const CommercialChatApp: React.FC = () => {
 
   // Initialize PWA and local storage
   useEffect(() => {
-    // Check if running in standalone mode (installed PWA or native WebView)
-    if (
-      typeof window !== 'undefined' &&
-      (window.matchMedia('(display-mode: standalone)').matches ||
-        (window.navigator as any).standalone === true)
-    ) {
-      setIsStandalone(true);
+    // Detect environment (Standalone, In-App browser, iOS)
+    if (typeof window !== 'undefined') {
+      const isStandaloneMode =
+        window.matchMedia('(display-mode: standalone)').matches ||
+        (window.navigator as any).standalone === true;
+      if (isStandaloneMode) {
+        setIsStandalone(true);
+      }
+
+      const ua = navigator.userAgent || '';
+      if (/Telegram|FBAN|FBAV|Instagram|VKApp|Line/i.test(ua)) {
+        setIsInAppBrowser(true);
+      }
+      if (/iPhone|iPad|iPod/i.test(ua)) {
+        setIsAppleDevice(true);
+      }
     }
 
     // Capture Android PWA install event
@@ -249,15 +264,20 @@ export const CommercialChatApp: React.FC = () => {
   // Handle Android PWA Install trigger
   const handleInstallApp = async () => {
     if (installPrompt) {
-      installPrompt.prompt();
-      const { outcome } = await installPrompt.userChoice;
-      if (outcome === 'accepted') {
-        setInstallSuccess(true);
-        setInstallPrompt(null);
+      try {
+        installPrompt.prompt();
+        const { outcome } = await installPrompt.userChoice;
+        if (outcome === 'accepted') {
+          setInstallSuccess(true);
+          setInstallPrompt(null);
+          setIsInstallModalOpen(false);
+        }
+      } catch {
+        setIsInstallModalOpen(true);
       }
     } else {
-      // Fallback instruction for Android Chrome
-      alert('Для установки на Android:\n1. Нажмите на значок меню браузера (три точки вверху справа).\n2. Выберите «Установить приложение» или «Добавить на главный экран».');
+      // Show instructional modal if prompt is suppressed or in in-app browser
+      setIsInstallModalOpen(true);
     }
   };
 
@@ -641,6 +661,17 @@ export const CommercialChatApp: React.FC = () => {
 
           {/* Quick Actions */}
           <div className="flex items-center space-x-2">
+            {!isStandalone && (
+              <button
+                onClick={handleInstallApp}
+                className="flex items-center space-x-1.5 text-xs text-emerald-400 bg-emerald-950/40 hover:bg-emerald-900/40 border border-emerald-800/60 px-2.5 py-1.5 rounded-lg transition-colors font-medium active:scale-[0.98]"
+                title="Установить приложение"
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="inline">Установить</span>
+              </button>
+            )}
+
             <button
               onClick={handleCreateNewChat}
               className="flex items-center space-x-1.5 text-xs text-zinc-400 hover:text-zinc-100 px-2.5 py-1.5 rounded-lg hover:bg-zinc-900 transition-colors"
@@ -651,6 +682,35 @@ export const CommercialChatApp: React.FC = () => {
             </button>
           </div>
         </header>
+
+        {/* PWA Install Notification Banner */}
+        {!isStandalone && !isBannerDismissed && (
+          <div className="bg-zinc-900/95 border-b border-zinc-800/80 px-4 py-2 flex items-center justify-between text-xs flex-shrink-0">
+            <div className="flex items-center space-x-2.5 overflow-hidden mr-2">
+              <Smartphone className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+              <span className="text-zinc-300 truncate text-[11px] sm:text-xs">
+                {isInAppBrowser
+                  ? 'Откройте ссылку в Chrome, чтобы установить на телефон'
+                  : 'Установите Claw AI на главный экран для быстрого запуска'}
+              </span>
+            </div>
+            <div className="flex items-center space-x-2 flex-shrink-0">
+              <button
+                onClick={handleInstallApp}
+                className="px-2.5 py-1 rounded-md bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold text-[11px] transition-colors active:scale-95"
+              >
+                Установить
+              </button>
+              <button
+                onClick={() => setIsBannerDismissed(true)}
+                className="p-1 text-zinc-500 hover:text-zinc-300 transition-colors"
+                aria-label="Закрыть баннер"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Message Stream Area */}
         <div className="flex-1 overflow-y-auto px-4 py-6 md:px-8 space-y-6">
@@ -817,6 +877,126 @@ export const CommercialChatApp: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Install Guide Modal */}
+      {isInstallModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150 text-left">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                  <Smartphone className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm text-zinc-100">Установка Claw AI</h3>
+                  <p className="text-[11px] text-zinc-500">Добавление на главный экран телефона</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsInstallModalOpen(false)}
+                className="p-1 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
+                aria-label="Закрыть"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* In-App Browser Warning (e.g. Telegram) */}
+            {isInAppBrowser && (
+              <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-800/50 text-amber-200 text-xs space-y-2">
+                <div className="flex items-center space-x-2 font-medium">
+                  <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                  <span>Открыто во встроенном окне Telegram</span>
+                </div>
+                <p className="text-[11px] text-amber-300/90 leading-relaxed">
+                  Telegram блокирует автоустановку PWA. Чтобы установить приложение:
+                </p>
+                <ol className="text-[11px] list-decimal list-inside space-y-1 text-amber-200/90 font-mono">
+                  <li>Нажмите <b>три точки (⋮)</b> вверху справа в Telegram</li>
+                  <li>Выберите <b>«Открыть в Chrome»</b> (или «В браузере»)</li>
+                  <li>В Chrome нажмите кнопку <b>«Установить»</b></li>
+                </ol>
+              </div>
+            )}
+
+            {/* Step-by-step instructions */}
+            <div className="space-y-3 text-xs text-zinc-300">
+              {!isAppleDevice ? (
+                <div className="space-y-2">
+                  <div className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider">
+                    Инструкция для Android (Chrome / Яндекс):
+                  </div>
+                  <div className="space-y-2 bg-zinc-950/60 p-3 rounded-xl border border-zinc-800/60">
+                    <div className="flex items-start space-x-2.5">
+                      <span className="w-5 h-5 rounded-full bg-zinc-800 flex items-center justify-center text-[11px] font-mono text-emerald-400 flex-shrink-0 mt-0.5">
+                        1
+                      </span>
+                      <p className="text-[12px] leading-snug">
+                        Нажмите меню браузера — <b>три точки (⋮)</b> в правом верхнем углу.
+                      </p>
+                    </div>
+                    <div className="flex items-start space-x-2.5">
+                      <span className="w-5 h-5 rounded-full bg-zinc-800 flex items-center justify-center text-[11px] font-mono text-emerald-400 flex-shrink-0 mt-0.5">
+                        2
+                      </span>
+                      <p className="text-[12px] leading-snug">
+                        Выберите пункт <b>«Установить приложение»</b> (или <b>«Добавить на главный экран»</b>).
+                      </p>
+                    </div>
+                    <div className="flex items-start space-x-2.5">
+                      <span className="w-5 h-5 rounded-full bg-zinc-800 flex items-center justify-center text-[11px] font-mono text-emerald-400 flex-shrink-0 mt-0.5">
+                        3
+                      </span>
+                      <p className="text-[12px] leading-snug">
+                        Подтвердите установку. Иконка Claw AI появится на рабочем столе смартфона.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="text-[11px] font-medium text-zinc-400 uppercase tracking-wider">
+                    Инструкция для iOS (Safari):
+                  </div>
+                  <div className="space-y-2 bg-zinc-950/60 p-3 rounded-xl border border-zinc-800/60">
+                    <div className="flex items-start space-x-2.5">
+                      <span className="w-5 h-5 rounded-full bg-zinc-800 flex items-center justify-center text-[11px] font-mono text-emerald-400 flex-shrink-0 mt-0.5">
+                        1
+                      </span>
+                      <p className="text-[12px] leading-snug">
+                        Нажмите кнопку <b>«Поделиться»</b> (квадрат со стрелкой вверх внизу Safari).
+                      </p>
+                    </div>
+                    <div className="flex items-start space-x-2.5">
+                      <span className="w-5 h-5 rounded-full bg-zinc-800 flex items-center justify-center text-[11px] font-mono text-emerald-400 flex-shrink-0 mt-0.5">
+                        2
+                      </span>
+                      <p className="text-[12px] leading-snug">
+                        Прокрутите меню вниз и выберите <b>«На экран "Домой"»</b>.
+                      </p>
+                    </div>
+                    <div className="flex items-start space-x-2.5">
+                      <span className="w-5 h-5 rounded-full bg-zinc-800 flex items-center justify-center text-[11px] font-mono text-emerald-400 flex-shrink-0 mt-0.5">
+                        3
+                      </span>
+                      <p className="text-[12px] leading-snug">
+                        Нажмите <b>«Добавить»</b> в правом верхнем углу.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => setIsInstallModalOpen(false)}
+              className="w-full py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-medium transition-colors"
+            >
+              Понятно
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
