@@ -100,7 +100,7 @@ The gateway loads its personality and operating constraints from `SOUL.md`:
 - Role definition: Technical assistant operating within a private gateway.
 - Tone and format: Concise, direct, Russian/English language adherence.
 - Security constraints: Protection against prompt injection, denial of destructive shell execution, token sanitization.
-- Context window: Sliding memory buffer compacted to 3500 tokens.
+- Context window: Sliding memory buffer compacted to 8000 tokens (with 4096+ tokens max response ceiling).
 
 ## Environment Variables (.env)
 
@@ -113,6 +113,8 @@ The gateway loads its personality and operating constraints from `SOUL.md`:
 | `DEFAULT_LLM_PROVIDER` | Active LLM engine (`groq`, `openai`, `openrouter`) | `groq` |
 | `GROQ_API_KEY` | Groq Cloud API key | Required for Groq |
 | `GROQ_MODEL` | Target LLM model | `qwen/qwen3.8-27b` |
+| `LLM_MAX_TOKENS` | Max tokens per response (standard dynamic per model) | `4096` |
+| `LLM_CONTEXT_TOKENS` | Context memory compaction ceiling | `8000` |
 | `SOUL_FILE_PATH` | Path to active SOUL.md file | `./SOUL.md` |
 | `PORT` | Web server port | `3000` |
 

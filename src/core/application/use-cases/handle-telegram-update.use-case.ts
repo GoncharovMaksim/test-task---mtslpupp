@@ -125,7 +125,8 @@ export class HandleTelegramUpdateUseCase {
         `- Runtime: Node.js (OpenClaw Clean Architecture)\n` +
         `- Assistant: OpenClaw AI Assistant\n` +
         `- Active sessions: ${activeCount}\n` +
-        `- Memory compaction: enabled (3500 token ceiling)\n` +
+        `- Memory compaction: enabled (8000 token ceiling)\n` +
+        `- Generation limit: 4096+ tokens (standard per model)\n` +
         `- Proxy bypass: verified active`;
       await this.telegramAdapter.sendMessage({
         chatId,

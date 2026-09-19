@@ -4,7 +4,7 @@ import { container } from '@/infrastructure/container';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { content, sessionId = 'web_session_default', userId = 'web_user', model } = body;
+    const { content, sessionId = 'web_session_default', userId = 'web_user', model, maxTokens } = body;
 
     if (!content || typeof content !== 'string') {
       return NextResponse.json({ error: 'content is required and must be a string' }, { status: 400 });
@@ -16,6 +16,7 @@ export async function POST(req: NextRequest) {
       content,
       channel: 'web',
       model,
+      maxTokens: typeof maxTokens === 'number' ? maxTokens : undefined,
     });
 
     return NextResponse.json({

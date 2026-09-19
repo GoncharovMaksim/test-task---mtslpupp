@@ -22,7 +22,8 @@ class Container {
     this.config.llm.groqApiKey,
     this.config.llm.groqModel,
     'https://api.groq.com/openai/v1',
-    this.config.llm.proxyUrl || this.config.proxyUrl
+    this.config.llm.proxyUrl || this.config.proxyUrl,
+    this.config.llm.maxTokens
   );
 
   public readonly telegramAdapter = new TelegramBotAdapter(
@@ -34,7 +35,8 @@ class Container {
   public readonly processChatMessageUseCase = new ProcessChatMessageUseCase(
     this.sessionRepository,
     this.soulRepository,
-    this.llmProvider
+    this.llmProvider,
+    this.config.llm.contextTokens
   );
 
   public readonly handleTelegramUpdateUseCase = new HandleTelegramUpdateUseCase(

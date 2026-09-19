@@ -77,4 +77,19 @@ describe('ProcessChatMessageUseCase', () => {
       })
     );
   });
+
+  it('should forward custom maxTokens parameter to llmProvider when specified', async () => {
+    await useCase.execute({
+      sessionId: 'session_tokens_test',
+      content: 'Hello with custom tokens',
+      maxTokens: 4096,
+    });
+
+    expect(mockLLMProvider.complete).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.objectContaining({
+        maxTokens: 4096,
+      })
+    );
+  });
 });

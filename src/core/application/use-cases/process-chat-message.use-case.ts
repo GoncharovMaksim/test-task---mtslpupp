@@ -11,6 +11,7 @@ export interface ProcessChatMessageRequest {
   channel?: 'telegram' | 'web';
   metadata?: Record<string, any>;
   model?: string;
+  maxTokens?: number;
 }
 
 export interface ProcessChatMessageResponse {
@@ -30,7 +31,8 @@ export class ProcessChatMessageUseCase {
   constructor(
     private readonly sessionRepository: ISessionRepository,
     private readonly soulRepository: ISoulRepository,
-    private readonly llmProvider: ILLMProvider
+    private readonly llmProvider: ILLMProvider,
+    private readonly contextTokenCeiling: number = 8000
   ) {}
 
   public async execute(request: ProcessChatMessageRequest): Promise<ProcessChatMessageResponse> {
@@ -58,11 +60,12 @@ export class ProcessChatMessageUseCase {
       CHANNEL: request.channel || 'web',
     });
 
-    const contextMessages = session.compactHistory(3500);
+    const contextMessages = session.compactHistory(this.contextTokenCeiling);
 
     const completion = await this.llmProvider.complete(contextMessages, {
       systemInstruction,
       model: request.model,
+      maxTokens: request.maxTokens,
     });
 
     const finalContent = request.channel === 'telegram'

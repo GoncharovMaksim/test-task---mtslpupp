@@ -13,6 +13,8 @@ export interface GatewayConfig {
     provider: 'groq' | 'openai' | 'openrouter';
     groqApiKey: string;
     groqModel: string;
+    maxTokens: number;
+    contextTokens: number;
     openrouterApiKey?: string;
     geminiApiKey?: string;
     openaiApiKey?: string;
@@ -82,6 +84,14 @@ export function loadGatewayConfig(): GatewayConfig {
         process.env.SANDBOX_GROQ_API_KEY ||
         '',
       groqModel: process.env.GROQ_MODEL || 'qwen/qwen3.8-27b',
+      maxTokens: parseInt(
+        process.env.LLM_MAX_TOKENS || process.env.GROQ_MAX_TOKENS || '4096',
+        10
+      ),
+      contextTokens: parseInt(
+        process.env.LLM_CONTEXT_TOKENS || '8000',
+        10
+      ),
       openrouterApiKey:
         process.env.OPENROUTER_API_KEY ||
         process.env.SANDBOX_OPENROUTER_API_KEY,

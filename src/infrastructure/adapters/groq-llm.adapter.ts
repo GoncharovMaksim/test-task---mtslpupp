@@ -6,6 +6,31 @@ import {
 } from '../../core/domain/interfaces/llm-provider.interface';
 import { proxyFetch } from '../services/proxy-http-client';
 
+export function getStandardMaxTokensForModel(model?: string, configuredDefault?: number): number {
+  if (configuredDefault && configuredDefault > 0) {
+    return configuredDefault;
+  }
+  if (!model) {
+    return 4096;
+  }
+  const m = model.toLowerCase();
+  // Models with expanded context/generation window on Groq
+  if (
+    m.includes('llama-3.3') ||
+    m.includes('llama-3.1') ||
+    m.includes('llama3') ||
+    m.includes('deepseek') ||
+    m.includes('gemma2')
+  ) {
+    return 8192;
+  }
+  if (m.includes('mixtral')) {
+    return 4096;
+  }
+  // Qwen and standard default
+  return 4096;
+}
+
 export class GroqLLMAdapter implements ILLMProvider {
   public readonly providerName = 'groq';
 
@@ -13,7 +38,8 @@ export class GroqLLMAdapter implements ILLMProvider {
     private readonly apiKey: string,
     private readonly defaultModel: string = 'qwen/qwen3.8-27b',
     private readonly baseUrl: string = 'https://api.groq.com/openai/v1',
-    private readonly proxyUrl?: string
+    private readonly proxyUrl?: string,
+    private readonly defaultMaxTokens?: number
   ) {}
 
 
@@ -42,11 +68,14 @@ export class GroqLLMAdapter implements ILLMProvider {
       });
     }
 
+    const resolvedMaxTokens =
+      options?.maxTokens ?? getStandardMaxTokensForModel(model, this.defaultMaxTokens);
+
     const payload = {
       model,
       messages: formattedMessages,
       temperature: options?.temperature ?? 0.7,
-      max_tokens: options?.maxTokens ?? 512,
+      max_tokens: resolvedMaxTokens,
     };
 
     const startTime = Date.now();
