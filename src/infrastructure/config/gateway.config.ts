@@ -87,8 +87,9 @@ export function loadGatewayConfig(): GatewayConfig {
       groqModel: process.env.GROQ_MODEL || 'qwen/qwen3.8-27b',
       geminiApiKey:
         process.env.GEMINI_API_KEY ||
-        process.env.SANDBOX_GEMINI_API_KEY,
-      geminiModel: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
+        process.env.SANDBOX_GEMINI_API_KEY ||
+        '',
+      geminiModel: process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite',
       maxTokens: parseInt(
         process.env.LLM_MAX_TOKENS || process.env.GROQ_MAX_TOKENS || '2048',
         10

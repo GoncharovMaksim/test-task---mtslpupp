@@ -74,6 +74,10 @@ export class TelegramBotAdapter implements IMessengerAdapter {
         body.parse_mode = payload.parseMode;
       }
 
+      if (i === chunks.length - 1 && payload.replyMarkup) {
+        body.reply_markup = payload.replyMarkup;
+      }
+
       const res = await this.callApi('sendMessage', body);
       let chunkOk = res.ok;
 
@@ -94,6 +98,14 @@ export class TelegramBotAdapter implements IMessengerAdapter {
     }
 
     return allOk;
+  }
+
+  public async answerCallbackQuery(callbackQueryId: string, text?: string): Promise<boolean> {
+    const res = await this.callApi('answerCallbackQuery', {
+      callback_query_id: callbackQueryId,
+      text,
+    });
+    return res.ok;
   }
 
   private async callApi(method: string, data: Record<string, any>): Promise<any> {

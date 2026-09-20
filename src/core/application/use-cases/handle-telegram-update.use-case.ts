@@ -22,6 +22,52 @@ export interface TelegramUpdate {
     date: number;
     text?: string;
   };
+  callback_query?: {
+    id: string;
+    from: {
+      id: number;
+      is_bot: boolean;
+      first_name: string;
+      username?: string;
+    };
+    message?: {
+      message_id: number;
+      chat: {
+        id: number;
+        type: string;
+      };
+    };
+    data?: string;
+  };
+}
+
+export function getModelSelectionKeyboard() {
+  return {
+    inline_keyboard: [
+      [
+        { text: '⚡ Qwen 27B (Groq)', callback_data: 'model:qwen/qwen3.8-27b' },
+        { text: '🧠 OpenAI 120B (Groq)', callback_data: 'model:openai/gpt-oss-120b' },
+      ],
+      [
+        { text: '🚀 Gemini 3.1 Flash Lite', callback_data: 'model:gemini-3.1-flash-lite' },
+        { text: '⚡ Gemini 3.5 Flash Lite', callback_data: 'model:gemini-3.5-flash-lite' },
+      ],
+      [
+        { text: '✨ Gemini 3.5 Flash', callback_data: 'model:gemini-3.5-flash' },
+        { text: '🌐 Groq Compound', callback_data: 'model:groq/compound' },
+      ],
+    ],
+  };
+}
+
+export function getMainReplyKeyboard() {
+  return {
+    keyboard: [
+      [{ text: '🤖 Выбрать модель' }, { text: '📊 Статус' }],
+      [{ text: '🧹 Сбросить контекст' }, { text: 'ℹ️ Помощь' }],
+    ],
+    resize_keyboard: true,
+  };
 }
 
 export class HandleTelegramUpdateUseCase {
@@ -38,6 +84,46 @@ export class HandleTelegramUpdateUseCase {
   }
 
   public async execute(update: TelegramUpdate): Promise<{ handled: boolean; action?: string; error?: string }> {
+    // 1. Handle Inline Button Clicks (callback_query)
+    if (update.callback_query) {
+      const cq = update.callback_query;
+      const data = cq.data || '';
+      const userId = cq.from.id;
+      const chatId = cq.message?.chat.id || userId;
+
+      if (this.allowedUsers.size > 0 && !this.allowedUsers.has(userId)) {
+        if (this.telegramAdapter.answerCallbackQuery) {
+          await this.telegramAdapter.answerCallbackQuery(cq.id, 'Доступ ограничен');
+        }
+        return { handled: true, action: 'callback_access_denied' };
+      }
+
+      if (data.startsWith('model:')) {
+        const targetModel = data.replace('model:', '');
+        const sessionId = `tg_${chatId}`;
+        const session = await this.sessionRepository.getOrCreate(sessionId, userId);
+        session.selectedModel = targetModel;
+        await this.sessionRepository.save(session);
+
+        if (this.telegramAdapter.answerCallbackQuery) {
+          await this.telegramAdapter.answerCallbackQuery(cq.id, `Выбрана модель: ${targetModel}`);
+        }
+
+        await this.telegramAdapter.sendMessage({
+          chatId,
+          text: `✅ Модель успешно переключена на:\n*${targetModel}*\n\nТеперь бот будет отвечать с использованием этой модели.`,
+          parseMode: 'Markdown',
+        });
+        return { handled: true, action: 'callback_model_changed' };
+      }
+
+      if (this.telegramAdapter.answerCallbackQuery) {
+        await this.telegramAdapter.answerCallbackQuery(cq.id);
+      }
+      return { handled: true, action: 'callback_unhandled' };
+    }
+
+    // 2. Handle Text Messages
     const message = update.message;
     if (!message || !message.text) {
       return { handled: false, action: 'ignored_non_text' };
@@ -63,29 +149,29 @@ export class HandleTelegramUpdateUseCase {
       const welcome =
         `OpenClaw Gateway active.\n\n` +
         `User: @${username} (ID: ${userId})\n` +
-        `Send any text to interact with the assistant.\n\n` +
-        `Commands:\n` +
-        `/status - Inspect Gateway runtime and connection metrics\n` +
-        `/model  - Switch or inspect active AI model (Llama 3.3, Gemini, GPT OSS)\n` +
-        `/soul   - Display active assistant persona guidelines\n` +
-        `/reset  - Clear current conversation memory\n` +
-        `/help   - Show operational guide`;
+        `Отправьте любой текст для общения с ассистентом.\n\n` +
+        `Команды и меню:\n` +
+        `🤖 /model  - Выбор модели (кнопками или командой)\n` +
+        `📊 /status - Проверка состояния шлюза и активной модели\n` +
+        `🧹 /reset  - Очистить контекст диалога\n` +
+        `ℹ️ /help   - Инструкция по использованию`;
       await this.telegramAdapter.sendMessage({
         chatId,
         text: welcome,
         replyToMessageId: message.message_id,
+        replyMarkup: getMainReplyKeyboard(),
       });
       return { handled: true, action: 'command_start' };
     }
 
-    if (text === '/help') {
+    if (text === '/help' || text === 'ℹ️ Помощь' || text === 'Помощь') {
       const help =
         `OpenClaw Assistant Operational Guide:\n\n` +
-        `- Continuous context is maintained across interactions.\n` +
-        `- Token budget is automatically compacted via sliding window.\n` +
-        `- No-VPN connectivity is routed through the Gateway proxy layer.\n` +
-        `- Use /model to switch between Llama 3.3 (70B), Gemini 2.0, GPT OSS, etc.\n` +
-        `- Use /reset to begin a clean conversation session.`;
+        `- Непрерывный контекст диалога сохраняется между репликами.\n` +
+        `- Доступны новейшие модели Google Gemini 3.1 & 3.5, Qwen и OpenAI.\n` +
+        `- Если ответ длинный, бот автоматически генерирует его за несколько подходов и не обрывает текст.\n` +
+        `- Используйте кнопку «🤖 Выбрать модель» для моментального переключения.\n` +
+        `- Используйте «🧹 Сбросить контекст» для начала нового диалога.`;
       await this.telegramAdapter.sendMessage({
         chatId,
         text: help,
@@ -94,7 +180,7 @@ export class HandleTelegramUpdateUseCase {
       return { handled: true, action: 'command_help' };
     }
 
-    if (text === '/reset') {
+    if (text === '/reset' || text === '🧹 Сбросить контекст' || text === 'Сбросить контекст') {
       const sessionId = `tg_${chatId}`;
       await this.sessionRepository.delete(sessionId);
       await this.telegramAdapter.sendMessage({
@@ -105,27 +191,36 @@ export class HandleTelegramUpdateUseCase {
       return { handled: true, action: 'command_reset' };
     }
 
-    if (text === '/model' || text.startsWith('/model ')) {
+    if (
+      text === '/model' ||
+      text.startsWith('/model ') ||
+      text === '🤖 Выбрать модель' ||
+      text === 'Выбрать модель' ||
+      text === 'Модели'
+    ) {
       const sessionId = `tg_${chatId}`;
       const session = await this.sessionRepository.getOrCreate(sessionId, userId);
       const arg = text.replace('/model', '').trim();
 
-      if (!arg) {
-        const current = session.selectedModel || 'qwen/qwen3.8-27b (по умолчанию)';
+      if (!arg || text.includes('Выбрать модель') || text === 'Модели') {
+        const current = session.selectedModel || 'gemini-3.1-flash-lite (по умолчанию)';
         const modelListMsg =
-          `🤖 Текущая модель: ${current}\n\n` +
-          `Доступные модели для переключения:\n` +
-          `• /model qwen/qwen3.8-27b — Qwen 27B (лимит 8K TPM, многошаговая авто-догенерация)\n` +
-          `• /model openai/gpt-oss-120b — Флагман OpenAI 120B на чипах Groq (лимит 8K TPM)\n` +
-          `• /model openai/gpt-oss-20b — Быстрая модель OpenAI 20B (лимит 8K TPM)\n` +
-          `• /model groq/compound — Пайплайн Groq Compound (лимит 70K TPM)\n` +
-          `• /model gemini-2.0-flash — Google Gemini 2.0 Flash (при наличии ключа)\n\n` +
-          `Для переключения скопируйте и отправьте команду с именем модели.`;
+          `🤖 *Выберите AI-модель кнопкой ниже:*\n\n` +
+          `Текущая активная модель: *${current}*\n\n` +
+          `• *Qwen 27B* — авто-догенерация длинных текстов на Groq\n` +
+          `• *Gemini 3.1 Flash Lite* — новая сверхбыстрая модель Google\n` +
+          `• *Gemini 3.5 Flash Lite* — баланс скорости и глубины анализа\n` +
+          `• *Gemini 3.5 Flash* — флагман Google с большим контекстом\n` +
+          `• *OpenAI 120B* — открытая модель OpenAI на чипах Groq\n` +
+          `• *Groq Compound* — мощный пайплайн с лимитом 70K TPM\n\n` +
+          `👇 Нажмите на нужную кнопку для переключения:`;
 
         await this.telegramAdapter.sendMessage({
           chatId,
           text: modelListMsg,
+          parseMode: 'Markdown',
           replyToMessageId: message.message_id,
+          replyMarkup: getModelSelectionKeyboard(),
         });
         return { handled: true, action: 'command_model' };
       }
@@ -135,12 +230,14 @@ export class HandleTelegramUpdateUseCase {
         targetModel = 'qwen/qwen3.8-27b';
       } else if (arg === 'gpt' || arg === 'gpt-oss' || arg === '120b') {
         targetModel = 'openai/gpt-oss-120b';
-      } else if (arg === '20b') {
-        targetModel = 'openai/gpt-oss-20b';
       } else if (arg === 'compound') {
         targetModel = 'groq/compound';
-      } else if (arg === 'gemini' || arg === 'flash') {
-        targetModel = 'gemini-2.0-flash';
+      } else if (arg === '3.1' || arg === '3.1-lite' || arg === 'gemini-3.1' || arg === 'gemini-3.1-flash-lite') {
+        targetModel = 'gemini-3.1-flash-lite';
+      } else if (arg === '3.5-lite' || arg === 'gemini-3.5-lite' || arg === 'gemini-3.5-flash-lite') {
+        targetModel = 'gemini-3.5-flash-lite';
+      } else if (arg === '3.5' || arg === 'gemini-3.5' || arg === 'gemini-3.5-flash') {
+        targetModel = 'gemini-3.5-flash';
       }
 
       session.selectedModel = targetModel;
@@ -148,7 +245,8 @@ export class HandleTelegramUpdateUseCase {
 
       await this.telegramAdapter.sendMessage({
         chatId,
-        text: `✅ Модель переключена на: ${targetModel}`,
+        text: `✅ Модель переключена на: *${targetModel}*`,
+        parseMode: 'Markdown',
         replyToMessageId: message.message_id,
       });
       return { handled: true, action: 'command_model_changed' };
@@ -169,7 +267,7 @@ export class HandleTelegramUpdateUseCase {
       return { handled: true, action: 'command_soul' };
     }
 
-    if (text === '/status') {
+    if (text === '/status' || text === '📊 Статус' || text === 'Статус') {
       const sessionId = `tg_${chatId}`;
       const session = await this.sessionRepository.getOrCreate(sessionId, userId);
       const activeCount = await this.sessionRepository.getActiveSessionCount();
@@ -177,11 +275,11 @@ export class HandleTelegramUpdateUseCase {
         `Gateway Status:\n` +
         `- Runtime: Node.js (OpenClaw Clean Architecture)\n` +
         `- Assistant: OpenClaw AI Assistant\n` +
-        `- Active model: ${session.selectedModel || 'qwen/qwen3.8-27b'}\n` +
+        `- Active model: ${session.selectedModel || 'gemini-3.1-flash-lite'}\n` +
         `- Active sessions: ${activeCount}\n` +
         `- Memory compaction: enabled (4000 token ceiling)\n` +
         `- Proxy bypass: verified active\n\n` +
-        `Переключение модели: /model`;
+        `Переключение модели: нажмите «🤖 Выбрать модель» или введите /model`;
       await this.telegramAdapter.sendMessage({
         chatId,
         text: statusText,

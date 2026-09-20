@@ -13,10 +13,12 @@ export interface OutgoingMessagePayload {
   text: string;
   replyToMessageId?: string | number;
   parseMode?: 'Markdown' | 'HTML';
+  replyMarkup?: any;
 }
 
 export interface IMessengerAdapter {
   readonly channelName: string;
   sendMessage(payload: OutgoingMessagePayload): Promise<boolean>;
+  answerCallbackQuery?(callbackQueryId: string, text?: string): Promise<boolean>;
   verifyWebhook?(secretToken?: string): boolean;
 }
