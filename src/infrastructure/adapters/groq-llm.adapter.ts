@@ -11,13 +11,16 @@ export function getStandardMaxTokensForModel(model?: string, configuredDefault?:
     return configuredDefault;
   }
   const m = (model || '').toLowerCase();
-  // groq/compound has 70K TPM on Groq
+  // Qwen on Groq on-demand tier has a strict output token limit of 1000 OTPM (output tokens per minute).
+  // We allocate 700 tokens for the first pass, allowing multi-step auto-continuation (pass 2 with ~280 tokens)
+  // to stay strictly within the 1000 OTPM ceiling without triggering rate limits.
+  if (m.includes('qwen')) {
+    return 700;
+  }
   if (m.includes('compound')) {
     return 4096;
   }
-  // qwen/qwen3.8-27b has 8K TPM (safe 2048 output tokens per pass)
-  // openai/gpt-oss-120b and 20b have 8K TPM (safe 2048 output tokens per pass)
-  if (m.includes('qwen') || m.includes('gpt-oss') || m.includes('llama')) {
+  if (m.includes('gpt-oss') || m.includes('llama')) {
     return 2048;
   }
   return 2048;
@@ -132,7 +135,7 @@ export class GroqLLMAdapter implements ILLMProvider {
         const errorText = await response.text();
         if (response.status === 429 && errorText.includes('output tokens per minute')) {
           try {
-            const fallbackTokens = Math.min(resolvedMaxTokens, 1024);
+            const fallbackTokens = model.toLowerCase().includes('qwen') ? 500 : Math.min(resolvedMaxTokens, 1024);
             const retryPayload = {
               ...payload,
               max_tokens: fallbackTokens,
@@ -193,6 +196,10 @@ export class GroqLLMAdapter implements ILLMProvider {
           ? `Предыдущий ответ был прерван лимитом длины на фразе: "${snippet}". Продолжай ответ строго с этого места без повторения уже сказанного и без вводных фраз.`
           : `Your previous response was truncated by length at: "${snippet}". Please continue exactly from where you left off without repeating prior text or adding filler.`;
 
+        const contMaxTokens = model.toLowerCase().includes('qwen')
+          ? Math.min(resolvedMaxTokens, 280)
+          : resolvedMaxTokens;
+
         const continuationPayload = {
           model,
           messages: [
@@ -201,7 +208,7 @@ export class GroqLLMAdapter implements ILLMProvider {
             { role: 'user', content: continuationPrompt },
           ],
           temperature: options?.temperature ?? 0.7,
-          max_tokens: resolvedMaxTokens,
+          max_tokens: contMaxTokens,
         };
 
         const contController = new AbortController();

@@ -47,7 +47,7 @@ describe('GroqLLMAdapter & Token Resolution', () => {
     });
 
     it('should return safe 2048 by default for 8K TPM models (qwen, gpt-oss, llama)', () => {
-      expect(getStandardMaxTokensForModel('qwen/qwen3.8-27b')).toBe(2048);
+      expect(getStandardMaxTokensForModel('qwen/qwen3.8-27b')).toBe(700);
       expect(getStandardMaxTokensForModel('openai/gpt-oss-120b')).toBe(2048);
       expect(getStandardMaxTokensForModel('openai/gpt-oss-20b')).toBe(2048);
       expect(getStandardMaxTokensForModel('llama-3.3-70b-versatile')).toBe(2048);
@@ -60,7 +60,7 @@ describe('GroqLLMAdapter & Token Resolution', () => {
   });
 
   describe('GroqLLMAdapter.complete', () => {
-    it('should use 2048 max_tokens for qwen when options.maxTokens is omitted', async () => {
+    it('should use 700 max_tokens for qwen when options.maxTokens is omitted', async () => {
       mockProxyFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -77,7 +77,7 @@ describe('GroqLLMAdapter & Token Resolution', () => {
       expect(mockProxyFetch).toHaveBeenCalledWith(
         expect.stringContaining('/chat/completions'),
         expect.objectContaining({
-          body: expect.stringMatching(/"max_tokens":2048/),
+          body: expect.stringMatching(/"max_tokens":700/),
         })
       );
       expect(res.content).toBe('Hello standard');
