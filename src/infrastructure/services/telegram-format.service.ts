@@ -243,4 +243,92 @@ export class TelegramFormatService {
 
     return processed;
   }
+
+  /**
+   * Splits a long message into chunks of at most `maxLength` characters.
+   * Prioritizes splitting on paragraph breaks (\n\n), newlines (\n),
+   * sentence boundaries (. / ! / ?), or word boundaries (spaces),
+   * preventing words or sentences from being cut in half.
+   * If a code block (```) is split across chunks, safely closes and reopens it.
+   */
+  public static splitMessage(text: string, maxLength: number = 4000): string[] {
+    if (!text || typeof text !== 'string') {
+      return [];
+    }
+
+    if (text.length <= maxLength) {
+      return [text];
+    }
+
+    const chunks: string[] = [];
+    let remaining = text;
+
+    while (remaining.length > maxLength) {
+      let splitIndex = -1;
+      const minThreshold = Math.floor(maxLength * 0.3);
+
+      // 1. Try splitting at paragraph break (\n\n)
+      const lastParagraph = remaining.lastIndexOf('\n\n', maxLength);
+      if (lastParagraph >= minThreshold) {
+        splitIndex = lastParagraph + 2;
+      }
+
+      // 2. Try splitting at single newline (\n)
+      if (splitIndex === -1) {
+        const lastNewline = remaining.lastIndexOf('\n', maxLength);
+        if (lastNewline >= minThreshold) {
+          splitIndex = lastNewline + 1;
+        }
+      }
+
+      // 3. Try splitting at sentence boundary (. / ! / ? followed by whitespace)
+      if (splitIndex === -1) {
+        const slice = remaining.slice(0, maxLength);
+        const sentenceRegex = /[.!?](\s+)/g;
+        let match: RegExpExecArray | null;
+        let lastSentenceIndex = -1;
+        while ((match = sentenceRegex.exec(slice)) !== null) {
+          lastSentenceIndex = match.index + 1;
+        }
+        if (lastSentenceIndex >= minThreshold) {
+          splitIndex = lastSentenceIndex;
+        }
+      }
+
+      // 4. Try splitting at word boundary (space)
+      if (splitIndex === -1) {
+        const lastSpace = remaining.lastIndexOf(' ', maxLength);
+        if (lastSpace >= minThreshold) {
+          splitIndex = lastSpace + 1;
+        }
+      }
+
+      // 5. Fallback: hard cut at maxLength
+      if (splitIndex === -1) {
+        splitIndex = maxLength;
+      }
+
+      let chunk = remaining.slice(0, splitIndex).trimEnd();
+      remaining = remaining.slice(splitIndex).trimStart();
+
+      // Check if chunk has an unclosed code block (```)
+      const fences = chunk.match(/```[a-zA-Z0-9_-]*/g) || [];
+      if (fences.length % 2 !== 0) {
+        const lastFence = fences[fences.length - 1];
+        chunk += '\n```';
+        remaining = lastFence + '\n' + remaining;
+      }
+
+      if (chunk.length > 0) {
+        chunks.push(chunk);
+      }
+    }
+
+    if (remaining.length > 0) {
+      chunks.push(remaining);
+    }
+
+    return chunks;
+  }
 }
+

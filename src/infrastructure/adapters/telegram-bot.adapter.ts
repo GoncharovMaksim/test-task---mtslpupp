@@ -51,29 +51,49 @@ export class TelegramBotAdapter implements IMessengerAdapter {
 
   public async sendMessage(payload: OutgoingMessagePayload): Promise<boolean> {
     const text = TelegramFormatService.sanitize(payload.text);
-    const body: Record<string, any> = {
-      chat_id: payload.chatId,
-      text,
-    };
+    const chunks = TelegramFormatService.splitMessage(text, 4000);
 
-    if (payload.replyToMessageId) {
-      body.reply_to_message_id = payload.replyToMessageId;
+    if (chunks.length === 0) {
+      return false;
     }
 
-    if (payload.parseMode) {
-      body.parse_mode = payload.parseMode;
+    let allOk = true;
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      const body: Record<string, any> = {
+        chat_id: payload.chatId,
+        text: chunk,
+      };
+
+      if (i === 0 && payload.replyToMessageId) {
+        body.reply_to_message_id = payload.replyToMessageId;
+      }
+
+      if (payload.parseMode) {
+        body.parse_mode = payload.parseMode;
+      }
+
+      const res = await this.callApi('sendMessage', body);
+      let chunkOk = res.ok;
+
+      // If markdown fails due to formatting, retry with plain text
+      if (!res.ok && payload.parseMode) {
+        delete body.parse_mode;
+        const retryRes = await this.callApi('sendMessage', body);
+        chunkOk = retryRes.ok;
+      }
+
+      if (!chunkOk) {
+        allOk = false;
+      }
+
+      if (i < chunks.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 80));
+      }
     }
 
-    const res = await this.callApi('sendMessage', body);
-
-    // If markdown fails due to formatting, retry with plain text
-    if (!res.ok && payload.parseMode) {
-      delete body.parse_mode;
-      const retryRes = await this.callApi('sendMessage', body);
-      return retryRes.ok;
-    }
-
-    return res.ok;
+    return allOk;
   }
 
   private async callApi(method: string, data: Record<string, any>): Promise<any> {
