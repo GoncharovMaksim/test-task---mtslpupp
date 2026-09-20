@@ -100,7 +100,7 @@ The gateway loads its personality and operating constraints from `SOUL.md`:
 - Role definition: Technical assistant operating within a private gateway.
 - Tone and format: Concise, direct, Russian/English language adherence.
 - Security constraints: Protection against prompt injection, denial of destructive shell execution, token sanitization.
-- Context window: Sliding memory buffer compacted to 8000 tokens (with 4096+ tokens max response ceiling).
+- Context window: Sliding memory buffer compacted to 4000 tokens (with safe 2048 tokens max response ceiling).
 
 ## Environment Variables (.env)
 
@@ -110,11 +110,13 @@ The gateway loads its personality and operating constraints from `SOUL.md`:
 | `TELEGRAM_ALLOWED_USERS` | Comma-separated list of allowed user IDs (whitelist) | Optional (open if empty) |
 | `TELEGRAM_PROXY_URL` | SOCKS5 proxy URL for local polling mode | Optional |
 | `TELEGRAM_API_BASE` | Base URL for Telegram API | `https://api.telegram.org` |
-| `DEFAULT_LLM_PROVIDER` | Active LLM engine (`groq`, `openai`, `openrouter`) | `groq` |
+| `DEFAULT_LLM_PROVIDER` | Active LLM engine (`groq`, `gemini`, `openai`, `openrouter`) | `groq` |
 | `GROQ_API_KEY` | Groq Cloud API key | Required for Groq |
-| `GROQ_MODEL` | Target LLM model | `qwen/qwen3.8-27b` |
-| `LLM_MAX_TOKENS` | Max tokens per response (standard dynamic per model) | `4096` |
-| `LLM_CONTEXT_TOKENS` | Context memory compaction ceiling | `8000` |
+| `GROQ_MODEL` | Target Groq LLM model | `qwen/qwen3.8-27b` |
+| `GEMINI_API_KEY` | Google Gemini API key | Required for Gemini |
+| `GEMINI_MODEL` | Target Gemini model | `gemini-2.0-flash` |
+| `LLM_MAX_TOKENS` | Max output tokens per response (safe limit per model) | `2048` |
+| `LLM_CONTEXT_TOKENS` | Context memory compaction ceiling | `4000` |
 | `SOUL_FILE_PATH` | Path to active SOUL.md file | `./SOUL.md` |
 | `PORT` | Web server port | `3000` |
 

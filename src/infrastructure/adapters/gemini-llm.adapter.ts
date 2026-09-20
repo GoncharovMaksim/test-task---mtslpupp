@@ -6,43 +6,23 @@ import {
 } from '../../core/domain/interfaces/llm-provider.interface';
 import { proxyFetch } from '../services/proxy-http-client';
 
-export function getStandardMaxTokensForModel(model?: string, configuredDefault?: number): number {
-  if (configuredDefault && configuredDefault > 0) {
-    return configuredDefault;
-  }
-  if (!model) {
-    return 2048;
-  }
-  const m = model.toLowerCase();
-  // Safe limits respecting Groq rate limit budget (TPM) and model boundaries
-  if (m.includes('llama-3.3') || m.includes('deepseek')) {
-    return 2048;
-  }
-  if (m.includes('llama-3.1') || m.includes('gpt-oss')) {
-    return 2048;
-  }
-  // Qwen and standard default
-  return 2048;
-}
-
-export class GroqLLMAdapter implements ILLMProvider {
-  public readonly providerName = 'groq';
+export class GeminiLLMAdapter implements ILLMProvider {
+  public readonly providerName = 'gemini';
 
   constructor(
     private readonly apiKey: string,
-    private readonly defaultModel: string = 'qwen/qwen3.8-27b',
-    private readonly baseUrl: string = 'https://api.groq.com/openai/v1',
+    private readonly defaultModel: string = 'gemini-2.0-flash',
+    private readonly baseUrl: string = 'https://generativelanguage.googleapis.com/v1beta/openai',
     private readonly proxyUrl?: string,
-    private readonly defaultMaxTokens?: number
+    private readonly defaultMaxTokens: number = 2048
   ) {}
-
 
   public async complete(
     messages: MessageEntity[],
     options?: CompletionOptions
   ): Promise<CompletionResult> {
     if (!this.apiKey) {
-      throw new Error('GROQ_API_KEY is not configured in the Gateway environment.');
+      throw new Error('GEMINI_API_KEY is not configured in the Gateway environment.');
     }
 
     const model = options?.model || this.defaultModel;
@@ -62,14 +42,11 @@ export class GroqLLMAdapter implements ILLMProvider {
       });
     }
 
-    const resolvedMaxTokens =
-      options?.maxTokens ?? getStandardMaxTokensForModel(model, this.defaultMaxTokens);
-
     const payload = {
       model,
       messages: formattedMessages,
       temperature: options?.temperature ?? 0.7,
-      max_tokens: resolvedMaxTokens,
+      max_tokens: options?.maxTokens ?? this.defaultMaxTokens,
     };
 
     const startTime = Date.now();
@@ -92,7 +69,7 @@ export class GroqLLMAdapter implements ILLMProvider {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Groq API returned ${response.status}: ${errorText}`);
+        throw new Error(`Gemini API returned ${response.status}: ${errorText}`);
       }
 
       const data = await response.json();
@@ -117,7 +94,7 @@ export class GroqLLMAdapter implements ILLMProvider {
     } catch (err: any) {
       clearTimeout(timeoutId);
       if (err.name === 'AbortError') {
-        throw new Error('Groq API request timed out after 30 seconds.');
+        throw new Error('Gemini API request timed out after 30 seconds.');
       }
       throw err;
     }
@@ -144,4 +121,3 @@ export class GroqLLMAdapter implements ILLMProvider {
     }
   }
 }
-

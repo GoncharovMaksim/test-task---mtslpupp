@@ -1,4 +1,4 @@
-export type LLMProviderType = 'groq' | 'openai' | 'openrouter' | 'ollama';
+export type LLMProviderType = 'groq' | 'openai' | 'openrouter' | 'ollama' | 'gemini';
 
 export interface ProviderConfig {
   type: LLMProviderType;

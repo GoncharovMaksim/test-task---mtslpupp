@@ -16,26 +16,23 @@ describe('GroqLLMAdapter & Token Resolution', () => {
 
   describe('getStandardMaxTokensForModel', () => {
     it('should return explicit configured default when provided', () => {
-      expect(getStandardMaxTokensForModel('qwen/qwen3.8-27b', 2048)).toBe(2048);
+      expect(getStandardMaxTokensForModel('qwen/qwen3.8-27b', 1024)).toBe(1024);
       expect(getStandardMaxTokensForModel('llama-3.3-70b-versatile', 1024)).toBe(1024);
     });
 
-    it('should return 4096 by default for qwen or unspecified models', () => {
-      expect(getStandardMaxTokensForModel('qwen/qwen3.8-27b')).toBe(4096);
-      expect(getStandardMaxTokensForModel(undefined)).toBe(4096);
-      expect(getStandardMaxTokensForModel('some-unknown-model')).toBe(4096);
-    });
-
-    it('should return 8192 for llama-3.3, llama-3.1, deepseek, and gemma2 models', () => {
-      expect(getStandardMaxTokensForModel('llama-3.3-70b-versatile')).toBe(8192);
-      expect(getStandardMaxTokensForModel('llama-3.1-8b-instant')).toBe(8192);
-      expect(getStandardMaxTokensForModel('deepseek-r1-distill-llama-70b')).toBe(8192);
-      expect(getStandardMaxTokensForModel('gemma2-9b-it')).toBe(8192);
+    it('should return safe 2048 by default for models respecting TPM limits', () => {
+      expect(getStandardMaxTokensForModel('qwen/qwen3.8-27b')).toBe(2048);
+      expect(getStandardMaxTokensForModel(undefined)).toBe(2048);
+      expect(getStandardMaxTokensForModel('some-unknown-model')).toBe(2048);
+      expect(getStandardMaxTokensForModel('llama-3.3-70b-versatile')).toBe(2048);
+      expect(getStandardMaxTokensForModel('llama-3.1-8b-instant')).toBe(2048);
+      expect(getStandardMaxTokensForModel('deepseek-r1-distill-llama-70b')).toBe(2048);
+      expect(getStandardMaxTokensForModel('openai/gpt-oss-120b')).toBe(2048);
     });
   });
 
   describe('GroqLLMAdapter.complete', () => {
-    it('should use model-resolved standard max_tokens (4096) when options.maxTokens is omitted', async () => {
+    it('should use model-resolved standard max_tokens (2048) when options.maxTokens is omitted', async () => {
       mockProxyFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -52,12 +49,12 @@ describe('GroqLLMAdapter & Token Resolution', () => {
       expect(mockProxyFetch).toHaveBeenCalledWith(
         expect.stringContaining('/chat/completions'),
         expect.objectContaining({
-          body: expect.stringMatching(/"max_tokens":4096/),
+          body: expect.stringMatching(/"max_tokens":2048/),
         })
       );
     });
 
-    it('should use 8192 max_tokens for llama-3.3-70b-versatile when omitted', async () => {
+    it('should use 2048 max_tokens for llama-3.3-70b-versatile when omitted', async () => {
       mockProxyFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -74,7 +71,7 @@ describe('GroqLLMAdapter & Token Resolution', () => {
       expect(mockProxyFetch).toHaveBeenCalledWith(
         expect.stringContaining('/chat/completions'),
         expect.objectContaining({
-          body: expect.stringMatching(/"max_tokens":8192/),
+          body: expect.stringMatching(/"max_tokens":2048/),
         })
       );
     });

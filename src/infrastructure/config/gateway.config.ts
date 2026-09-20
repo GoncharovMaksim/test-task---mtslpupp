@@ -10,13 +10,14 @@ export interface GatewayConfig {
     webhookUrl?: string;
   };
   llm: {
-    provider: 'groq' | 'openai' | 'openrouter';
+    provider: 'groq' | 'openai' | 'openrouter' | 'gemini';
     groqApiKey: string;
     groqModel: string;
+    geminiApiKey?: string;
+    geminiModel: string;
     maxTokens: number;
     contextTokens: number;
     openrouterApiKey?: string;
-    geminiApiKey?: string;
     openaiApiKey?: string;
     openaiBaseUrl?: string;
     proxyUrl?: string;
@@ -84,20 +85,21 @@ export function loadGatewayConfig(): GatewayConfig {
         process.env.SANDBOX_GROQ_API_KEY ||
         '',
       groqModel: process.env.GROQ_MODEL || 'qwen/qwen3.8-27b',
+      geminiApiKey:
+        process.env.GEMINI_API_KEY ||
+        process.env.SANDBOX_GEMINI_API_KEY,
+      geminiModel: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
       maxTokens: parseInt(
-        process.env.LLM_MAX_TOKENS || process.env.GROQ_MAX_TOKENS || '4096',
+        process.env.LLM_MAX_TOKENS || process.env.GROQ_MAX_TOKENS || '2048',
         10
       ),
       contextTokens: parseInt(
-        process.env.LLM_CONTEXT_TOKENS || '8000',
+        process.env.LLM_CONTEXT_TOKENS || '4000',
         10
       ),
       openrouterApiKey:
         process.env.OPENROUTER_API_KEY ||
         process.env.SANDBOX_OPENROUTER_API_KEY,
-      geminiApiKey:
-        process.env.GEMINI_API_KEY ||
-        process.env.SANDBOX_GEMINI_API_KEY,
       openaiApiKey: process.env.OPENAI_API_KEY,
       openaiBaseUrl: process.env.OPENAI_BASE_URL,
       proxyUrl: resolvedProxy,

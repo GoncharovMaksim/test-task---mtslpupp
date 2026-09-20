@@ -60,25 +60,39 @@ const AVAILABLE_MODELS: ModelOption[] = [
     badge: 'Pro',
   },
   {
+    id: 'gemini-2.0-flash',
+    name: 'Google Gemini 2.0 Flash',
+    shortName: 'Gemini 2.0',
+    tagline: 'Флагманский мультимодальный интеллект Google нового поколения',
+    badge: 'Google AI',
+  },
+  {
+    id: 'gemini-1.5-flash',
+    name: 'Google Gemini 1.5 Flash',
+    shortName: 'Gemini 1.5',
+    tagline: 'Сверхбыстрая модель Google с гигантским контекстным окном',
+    badge: 'Google AI',
+  },
+  {
+    id: 'openai/gpt-oss-120b',
+    name: 'GPT OSS (120B)',
+    shortName: 'GPT OSS',
+    tagline: 'Открытая флагманская модель OpenAI на ультрабыстрых чипах Groq',
+    badge: 'New',
+  },
+  {
     id: 'deepseek-r1-distill-llama-70b',
     name: 'DeepSeek R1 (70B)',
     shortName: 'DeepSeek R1',
-    tagline: 'Пошаговые рассуждения и точная логика',
+    tagline: 'Пошаговые рассуждения и точная математическая логика',
     badge: 'Thinking',
   },
   {
     id: 'llama-3.1-8b-instant',
     name: 'Llama 3.1 (8B)',
     shortName: 'Llama 3.1',
-    tagline: 'Мгновенный отклик и высокая скорость генерации',
+    tagline: 'Мгновенный отклик и сверхвысокая скорость генерации',
     badge: 'Flash',
-  },
-  {
-    id: 'mixtral-8x7b-32768',
-    name: 'Mixtral 8x7B (32k)',
-    shortName: 'Mixtral 8x7B',
-    tagline: 'Обработка длинных документов и контекст 32k',
-    badge: '32k Context',
   },
 ];
 

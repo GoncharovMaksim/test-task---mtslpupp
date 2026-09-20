@@ -5,6 +5,8 @@ import { ProcessChatMessageUseCase } from '../core/application/use-cases/process
 import { TestConnectivityUseCase } from '../core/application/use-cases/test-connectivity.use-case';
 import { FileSoulRepository } from './adapters/file-soul.repository';
 import { GroqLLMAdapter } from './adapters/groq-llm.adapter';
+import { GeminiLLMAdapter } from './adapters/gemini-llm.adapter';
+import { MultiProviderLLMAdapter } from './adapters/multi-provider-llm.adapter';
 import { InMemorySessionRepository } from './adapters/in-memory-session.repository';
 import { TelegramBotAdapter } from './adapters/telegram-bot.adapter';
 import { loadGatewayConfig } from './config/gateway.config';
@@ -18,12 +20,28 @@ class Container {
   public readonly soulRepository = new FileSoulRepository(this.config.soulFilePath);
   public readonly proxyService = new NetworkProxyService(this.config.telegram.proxyUrl);
 
-  public readonly llmProvider = new GroqLLMAdapter(
+  public readonly groqProvider = new GroqLLMAdapter(
     this.config.llm.groqApiKey,
     this.config.llm.groqModel,
     'https://api.groq.com/openai/v1',
     this.config.llm.proxyUrl || this.config.proxyUrl,
     this.config.llm.maxTokens
+  );
+
+  public readonly geminiProvider = new GeminiLLMAdapter(
+    this.config.llm.geminiApiKey || '',
+    this.config.llm.geminiModel,
+    'https://generativelanguage.googleapis.com/v1beta/openai',
+    this.config.llm.proxyUrl || this.config.proxyUrl,
+    this.config.llm.maxTokens
+  );
+
+  public readonly llmProvider = new MultiProviderLLMAdapter(
+    this.config.llm.provider === 'gemini' ? this.geminiProvider : this.groqProvider,
+    {
+      groq: this.groqProvider,
+      gemini: this.geminiProvider,
+    }
   );
 
   public readonly telegramAdapter = new TelegramBotAdapter(
