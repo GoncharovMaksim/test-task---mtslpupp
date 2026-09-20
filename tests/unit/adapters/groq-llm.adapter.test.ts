@@ -1,4 +1,8 @@
-import { getStandardMaxTokensForModel, GroqLLMAdapter } from '../../../src/infrastructure/adapters/groq-llm.adapter';
+import {
+  getStandardMaxTokensForModel,
+  stitchChunks,
+  GroqLLMAdapter,
+} from '../../../src/infrastructure/adapters/groq-llm.adapter';
 import { MessageEntity } from '../../../src/core/domain/entities/message.entity';
 
 jest.mock('../../../src/infrastructure/services/proxy-http-client', () => ({
@@ -14,29 +18,53 @@ describe('GroqLLMAdapter & Token Resolution', () => {
     jest.clearAllMocks();
   });
 
-  describe('getStandardMaxTokensForModel', () => {
-    it('should return explicit configured default when provided but cap qwen at 500', () => {
-      expect(getStandardMaxTokensForModel('qwen/qwen3.8-27b', 1024)).toBe(500);
-      expect(getStandardMaxTokensForModel('llama-3.3-70b-versatile', 1024)).toBe(1024);
+  describe('stitchChunks', () => {
+    it('should stitch partial word completion cleanly', () => {
+      const result = stitchChunks('добавляет сет', 'евые задержки');
+      expect(result).toBe('добавляет сетевые задержки');
     });
 
-    it('should return safe 2048 by default for models respecting TPM limits and 500 for qwen', () => {
-      expect(getStandardMaxTokensForModel('qwen/qwen3.8-27b')).toBe(500);
-      expect(getStandardMaxTokensForModel(undefined)).toBe(1500);
-      expect(getStandardMaxTokensForModel('some-unknown-model')).toBe(1500);
-      expect(getStandardMaxTokensForModel('llama-3.3-70b-versatile')).toBe(1500);
-      expect(getStandardMaxTokensForModel('llama-3.1-8b-instant')).toBe(2048);
-      expect(getStandardMaxTokensForModel('deepseek-r1-distill-llama-70b')).toBe(1500);
-      expect(getStandardMaxTokensForModel('openai/gpt-oss-120b')).toBe(1500);
+    it('should handle repeated overlapping word cleanly', () => {
+      const result = stitchChunks('добавляет сет', 'сетевые задержки');
+      expect(result).toBe('добавляет сетевые задержки');
+    });
+
+    it('should strip common continuation preambles', () => {
+      const result = stitchChunks('добавляет сет', 'Конечно, продолжаю: евые задержки');
+      expect(result).toBe('добавляет сетевые задержки');
+    });
+
+    it('should preserve newlines across paragraph breaks', () => {
+      const result = stitchChunks('Пункт 1.\n\n', 'Пункт 2.');
+      expect(result).toBe('Пункт 1.\n\nПункт 2.');
+    });
+  });
+
+  describe('getStandardMaxTokensForModel', () => {
+    it('should return explicit configured default when provided', () => {
+      expect(getStandardMaxTokensForModel('qwen/qwen3.8-27b', 1024)).toBe(1024);
+      expect(getStandardMaxTokensForModel('openai/gpt-oss-120b', 3000)).toBe(3000);
+    });
+
+    it('should return safe 2048 by default for 8K TPM models (qwen, gpt-oss, llama)', () => {
+      expect(getStandardMaxTokensForModel('qwen/qwen3.8-27b')).toBe(2048);
+      expect(getStandardMaxTokensForModel('openai/gpt-oss-120b')).toBe(2048);
+      expect(getStandardMaxTokensForModel('openai/gpt-oss-20b')).toBe(2048);
+      expect(getStandardMaxTokensForModel('llama-3.3-70b-versatile')).toBe(2048);
+    });
+
+    it('should return 4096 for high-throughput compound models (70K TPM)', () => {
+      expect(getStandardMaxTokensForModel('groq/compound')).toBe(4096);
+      expect(getStandardMaxTokensForModel('groq/compound-mini')).toBe(4096);
     });
   });
 
   describe('GroqLLMAdapter.complete', () => {
-    it('should use model-resolved standard max_tokens (500) for qwen when options.maxTokens is omitted', async () => {
+    it('should use 2048 max_tokens for qwen when options.maxTokens is omitted', async () => {
       mockProxyFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          choices: [{ message: { content: 'Hello standard' } }],
+          choices: [{ message: { content: 'Hello standard' }, finish_reason: 'stop' }],
           usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
         }),
       } as any);
@@ -44,56 +72,92 @@ describe('GroqLLMAdapter & Token Resolution', () => {
       const adapter = new GroqLLMAdapter('test-key', 'qwen/qwen3.8-27b');
       const messages = [new MessageEntity({ role: 'user', content: 'Hi' })];
 
-      await adapter.complete(messages);
+      const res = await adapter.complete(messages);
 
       expect(mockProxyFetch).toHaveBeenCalledWith(
         expect.stringContaining('/chat/completions'),
         expect.objectContaining({
-          body: expect.stringMatching(/"max_tokens":500/),
+          body: expect.stringMatching(/"max_tokens":2048/),
         })
       );
+      expect(res.content).toBe('Hello standard');
     });
 
-    it('should use 1500 max_tokens for llama-3.3-70b-versatile when omitted', async () => {
+    it('should automatically continue and stitch response when finish_reason is length', async () => {
+      // 1st pass truncated by length
       mockProxyFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          choices: [{ message: { content: 'Hello llama' } }],
+          choices: [
+            {
+              message: { content: '1. Достоинство\n2. Недостаток добавляет сет' },
+              finish_reason: 'length',
+            },
+          ],
+          usage: { prompt_tokens: 100, completion_tokens: 500, total_tokens: 600 },
+        }),
+      } as any);
+
+      // 2nd pass continuation finishes cleanly
+      mockProxyFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          choices: [
+            {
+              message: { content: 'евые задержки и накладные расходы.' },
+              finish_reason: 'stop',
+            },
+          ],
+          usage: { prompt_tokens: 650, completion_tokens: 80, total_tokens: 730 },
+        }),
+      } as any);
+
+      const adapter = new GroqLLMAdapter('test-key', 'qwen/qwen3.8-27b');
+      const messages = [new MessageEntity({ role: 'user', content: 'Напиши анализ' })];
+
+      const result = await adapter.complete(messages);
+
+      expect(mockProxyFetch).toHaveBeenCalledTimes(2);
+      expect(result.content).toBe('1. Достоинство\n2. Недостаток добавляет сетевые задержки и накладные расходы.');
+      expect(result.tokensUsed?.completionTokens).toBe(580);
+    });
+
+    it('should not continue if options.autoContinue is false', async () => {
+      mockProxyFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: 'Truncated output' }, finish_reason: 'length' }],
           usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
         }),
       } as any);
 
-      const adapter = new GroqLLMAdapter('test-key', 'llama-3.3-70b-versatile');
+      const adapter = new GroqLLMAdapter('test-key', 'qwen/qwen3.8-27b');
       const messages = [new MessageEntity({ role: 'user', content: 'Hi' })];
 
-      await adapter.complete(messages);
+      const result = await adapter.complete(messages, { autoContinue: false });
 
-      expect(mockProxyFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/chat/completions'),
-        expect.objectContaining({
-          body: expect.stringMatching(/"max_tokens":1500/),
-        })
-      );
+      expect(mockProxyFetch).toHaveBeenCalledTimes(1);
+      expect(result.content).toBe('Truncated output');
     });
 
     it('should respect explicit options.maxTokens when passed', async () => {
       mockProxyFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          choices: [{ message: { content: 'Hello custom' } }],
+          choices: [{ message: { content: 'Hello custom' }, finish_reason: 'stop' }],
           usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
         }),
       } as any);
 
-      const adapter = new GroqLLMAdapter('test-key', 'llama-3.3-70b-versatile');
+      const adapter = new GroqLLMAdapter('test-key', 'openai/gpt-oss-120b');
       const messages = [new MessageEntity({ role: 'user', content: 'Hi' })];
 
-      await adapter.complete(messages, { maxTokens: 6000 });
+      await adapter.complete(messages, { maxTokens: 3500 });
 
       expect(mockProxyFetch).toHaveBeenCalledWith(
         expect.stringContaining('/chat/completions'),
         expect.objectContaining({
-          body: expect.stringMatching(/"max_tokens":6000/),
+          body: expect.stringMatching(/"max_tokens":3500/),
         })
       );
     });
@@ -103,14 +167,14 @@ describe('GroqLLMAdapter & Token Resolution', () => {
       mockProxyFetch.mockResolvedValueOnce({
         ok: false,
         status: 429,
-        text: async () => 'Request too large on output tokens per minute (OTPM): Limit 1000, Requested 1127.',
+        text: async () => 'Request too large on output tokens per minute (OTPM): Limit 8000, Requested 9000.',
       } as any);
 
       // Second fallback attempt succeeds
       mockProxyFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          choices: [{ message: { content: 'Recovered response' } }],
+          choices: [{ message: { content: 'Recovered response' }, finish_reason: 'stop' }],
           usage: { prompt_tokens: 10, completion_tokens: 15, total_tokens: 25 },
         }),
       } as any);

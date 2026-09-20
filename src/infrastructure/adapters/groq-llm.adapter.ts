@@ -7,22 +7,60 @@ import {
 import { proxyFetch } from '../services/proxy-http-client';
 
 export function getStandardMaxTokensForModel(model?: string, configuredDefault?: number): number {
-  const m = (model || '').toLowerCase();
-  // Qwen on Groq on-demand tier has a hard limit of 1000 OTPM (output tokens per minute).
-  // We strictly cap Qwen at 500 tokens so requests do not trigger 429 OTPM exhaustion.
-  if (m.includes('qwen')) {
-    return Math.min(configuredDefault && configuredDefault > 0 ? configuredDefault : 500, 500);
-  }
   if (configuredDefault && configuredDefault > 0) {
     return configuredDefault;
   }
-  if (m.includes('llama-3.1')) {
+  const m = (model || '').toLowerCase();
+  // groq/compound has 70K TPM on Groq
+  if (m.includes('compound')) {
+    return 4096;
+  }
+  // qwen/qwen3.8-27b has 8K TPM (safe 2048 output tokens per pass)
+  // openai/gpt-oss-120b and 20b have 8K TPM (safe 2048 output tokens per pass)
+  if (m.includes('qwen') || m.includes('gpt-oss') || m.includes('llama')) {
     return 2048;
   }
-  if (m.includes('llama-3.3') || m.includes('deepseek') || m.includes('gpt-oss')) {
-    return 1500;
+  return 2048;
+}
+
+/**
+ * Stitches two consecutive response chunks together cleanly, avoiding duplicate words,
+ * removing assistant preambles (e.g. "Конечно, продолжаю..."), and ensuring partial words
+ * cut off by max_tokens boundary are reconstructed accurately.
+ */
+export function stitchChunks(prev: string, next: string): string {
+  if (!prev) return next;
+  if (!next) return prev;
+
+  // Clean out common continuation preambles
+  let cleanedNext = next.replace(
+    /^(?:Конечно,?\s*(?:я\s*)?продолж[а-я]+[:\s]*|Продолжение[:\s]*|Продолжаю[:\s]*|Вот продолжение[:\s]*|Sure,?\s*continuing[:\s]*|Continuing[:\s]*)/i,
+    ''
+  );
+
+  // If next starts with whitespace and prev ends with whitespace, collapse to single whitespace
+  if (/\s$/.test(prev) && /^\s/.test(cleanedNext)) {
+    cleanedNext = cleanedNext.replace(/^\s+/, '');
   }
-  return 1500;
+
+  // Check if last word of prev overlaps with start of cleanedNext
+  const prevWordMatch = prev.match(/([a-zA-Zа-яА-Я0-9_-]+)$/);
+  if (prevWordMatch) {
+    const lastWord = prevWordMatch[1];
+    const nextWordMatch = cleanedNext.match(/^([a-zA-Zа-яА-Я0-9_-]+)/);
+    if (nextWordMatch) {
+      const nextWord = nextWordMatch[1];
+      // If nextWord starts with lastWord (e.g. "сетевые" starts with "сет")
+      if (
+        nextWord.toLowerCase().startsWith(lastWord.toLowerCase()) &&
+        nextWord.length >= lastWord.length
+      ) {
+        return prev.slice(0, -lastWord.length) + cleanedNext;
+      }
+    }
+  }
+
+  return prev + cleanedNext;
 }
 
 export class GroqLLMAdapter implements ILLMProvider {
@@ -94,13 +132,9 @@ export class GroqLLMAdapter implements ILLMProvider {
         const errorText = await response.text();
         if (response.status === 429 && errorText.includes('output tokens per minute')) {
           try {
-            const fallbackModel = model.toLowerCase().includes('qwen')
-              ? 'llama-3.3-70b-versatile'
-              : model;
-            const fallbackTokens = Math.min(resolvedMaxTokens, 350);
+            const fallbackTokens = Math.min(resolvedMaxTokens, 1024);
             const retryPayload = {
               ...payload,
-              model: fallbackModel,
               max_tokens: fallbackTokens,
             };
             const retryResp = await proxyFetch(`${this.baseUrl}/chat/completions`, {
@@ -126,7 +160,7 @@ export class GroqLLMAdapter implements ILLMProvider {
                     }
                   : undefined,
                 latencyMs: Date.now() - startTime,
-                model: fallbackModel,
+                model,
                 provider: this.providerName,
               };
             }
@@ -138,20 +172,90 @@ export class GroqLLMAdapter implements ILLMProvider {
       }
 
       const data = await response.json();
+      const choice = data.choices?.[0];
+      let accumulatedContent = choice?.message?.content || '';
+      let finishReason = choice?.finish_reason;
+
+      let promptTokens = data.usage?.prompt_tokens || 0;
+      let completionTokens = data.usage?.completion_tokens || 0;
+      let totalTokens = data.usage?.total_tokens || 0;
+
+      // Auto-continuation loop: if generation was truncated due to token limit ('length')
+      // and auto-continuation is not explicitly disabled, automatically request continuation passes.
+      const maxContinuations = options?.autoContinue === false ? 0 : (options?.maxContinuations ?? 2);
+      let continuationCount = 0;
+
+      while (finishReason === 'length' && continuationCount < maxContinuations) {
+        continuationCount++;
+        const snippet = accumulatedContent.slice(-80).trim();
+        const isRussian = /[а-яА-Я]/.test(accumulatedContent);
+        const continuationPrompt = isRussian
+          ? `Предыдущий ответ был прерван лимитом длины на фразе: "${snippet}". Продолжай ответ строго с этого места без повторения уже сказанного и без вводных фраз.`
+          : `Your previous response was truncated by length at: "${snippet}". Please continue exactly from where you left off without repeating prior text or adding filler.`;
+
+        const continuationPayload = {
+          model,
+          messages: [
+            ...formattedMessages,
+            { role: 'assistant', content: accumulatedContent },
+            { role: 'user', content: continuationPrompt },
+          ],
+          temperature: options?.temperature ?? 0.7,
+          max_tokens: resolvedMaxTokens,
+        };
+
+        const contController = new AbortController();
+        const contTimeoutId = setTimeout(() => contController.abort(), 25000);
+
+        try {
+          const contResponse = await proxyFetch(`${this.baseUrl}/chat/completions`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${this.apiKey}`,
+            },
+            body: JSON.stringify(continuationPayload),
+            signal: contController.signal,
+            proxyUrl: this.proxyUrl,
+          });
+          clearTimeout(contTimeoutId);
+
+          if (!contResponse.ok) {
+            // If continuation fails (e.g. rate limit), break loop and preserve existing response
+            break;
+          }
+
+          const contData = await contResponse.json();
+          const contChoice = contData.choices?.[0];
+          const nextChunk = contChoice?.message?.content || '';
+
+          if (!nextChunk) {
+            break;
+          }
+
+          accumulatedContent = stitchChunks(accumulatedContent, nextChunk);
+          finishReason = contChoice?.finish_reason;
+
+          if (contData.usage) {
+            promptTokens += contData.usage.prompt_tokens || 0;
+            completionTokens += contData.usage.completion_tokens || 0;
+            totalTokens += contData.usage.total_tokens || 0;
+          }
+        } catch {
+          clearTimeout(contTimeoutId);
+          break;
+        }
+      }
+
       const latencyMs = Date.now() - startTime;
 
-      const choice = data.choices?.[0];
-      const replyContent = choice?.message?.content || '';
-
       return {
-        content: replyContent,
-        tokensUsed: data.usage
-          ? {
-              promptTokens: data.usage.prompt_tokens,
-              completionTokens: data.usage.completion_tokens,
-              totalTokens: data.usage.total_tokens,
-            }
-          : undefined,
+        content: accumulatedContent,
+        tokensUsed: {
+          promptTokens,
+          completionTokens,
+          totalTokens,
+        },
         latencyMs,
         model,
         provider: this.providerName,

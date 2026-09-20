@@ -84,7 +84,7 @@ export function loadGatewayConfig(): GatewayConfig {
         process.env.GROQ_API_KEY ||
         process.env.SANDBOX_GROQ_API_KEY ||
         '',
-      groqModel: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+      groqModel: process.env.GROQ_MODEL || 'qwen/qwen3.8-27b',
       geminiApiKey:
         process.env.GEMINI_API_KEY ||
         process.env.SANDBOX_GEMINI_API_KEY,

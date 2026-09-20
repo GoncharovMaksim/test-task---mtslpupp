@@ -29,7 +29,9 @@ export class MultiProviderLLMAdapter implements ILLMProvider {
         (m.startsWith('llama') ||
           m.startsWith('qwen') ||
           m.startsWith('deepseek') ||
-          m.startsWith('openai/')) &&
+          m.startsWith('openai/') ||
+          m.startsWith('groq/') ||
+          m.startsWith('allam')) &&
         this.providers.groq
       ) {
         return this.providers.groq;

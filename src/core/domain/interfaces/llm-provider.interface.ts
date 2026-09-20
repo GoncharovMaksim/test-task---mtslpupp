@@ -5,6 +5,8 @@ export interface CompletionOptions {
   maxTokens?: number;
   model?: string;
   systemInstruction?: string;
+  autoContinue?: boolean;
+  maxContinuations?: number;
 }
 
 export interface CompletionResult {

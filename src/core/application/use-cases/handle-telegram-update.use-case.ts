@@ -111,15 +111,15 @@ export class HandleTelegramUpdateUseCase {
       const arg = text.replace('/model', '').trim();
 
       if (!arg) {
-        const current = session.selectedModel || 'llama-3.3-70b-versatile (по умолчанию)';
+        const current = session.selectedModel || 'qwen/qwen3.8-27b (по умолчанию)';
         const modelListMsg =
           `🤖 Текущая модель: ${current}\n\n` +
           `Доступные модели для переключения:\n` +
-          `• /model llama-3.3-70b-versatile — Флагман Meta Llama 3.3 (70B, высокие лимиты токенов)\n` +
-          `• /model gemini-2.0-flash — Google Gemini 2.0 Flash (огромные лимиты)\n` +
-          `• /model llama-3.1-8b-instant — Сверхбыстрая Llama 8B\n` +
-          `• /model openai/gpt-oss-120b — Флагман OpenAI 120B на чипах Groq\n` +
-          `• /model qwen/qwen3.8-27b — Qwen 3.8 (лимит Groq 1000 OTPM)\n\n` +
+          `• /model qwen/qwen3.8-27b — Qwen 27B (лимит 8K TPM, многошаговая авто-догенерация)\n` +
+          `• /model openai/gpt-oss-120b — Флагман OpenAI 120B на чипах Groq (лимит 8K TPM)\n` +
+          `• /model openai/gpt-oss-20b — Быстрая модель OpenAI 20B (лимит 8K TPM)\n` +
+          `• /model groq/compound — Пайплайн Groq Compound (лимит 70K TPM)\n` +
+          `• /model gemini-2.0-flash — Google Gemini 2.0 Flash (при наличии ключа)\n\n` +
           `Для переключения скопируйте и отправьте команду с именем модели.`;
 
         await this.telegramAdapter.sendMessage({
@@ -131,16 +131,16 @@ export class HandleTelegramUpdateUseCase {
       }
 
       let targetModel = arg;
-      if (arg === 'llama' || arg === 'llama-70b' || arg === '70b') {
-        targetModel = 'llama-3.3-70b-versatile';
-      } else if (arg === 'llama-8b' || arg === '8b') {
-        targetModel = 'llama-3.1-8b-instant';
+      if (arg === 'qwen' || arg === '27b') {
+        targetModel = 'qwen/qwen3.8-27b';
+      } else if (arg === 'gpt' || arg === 'gpt-oss' || arg === '120b') {
+        targetModel = 'openai/gpt-oss-120b';
+      } else if (arg === '20b') {
+        targetModel = 'openai/gpt-oss-20b';
+      } else if (arg === 'compound') {
+        targetModel = 'groq/compound';
       } else if (arg === 'gemini' || arg === 'flash') {
         targetModel = 'gemini-2.0-flash';
-      } else if (arg === 'qwen') {
-        targetModel = 'qwen/qwen3.8-27b';
-      } else if (arg === 'gpt' || arg === 'gpt-oss') {
-        targetModel = 'openai/gpt-oss-120b';
       }
 
       session.selectedModel = targetModel;
@@ -177,7 +177,7 @@ export class HandleTelegramUpdateUseCase {
         `Gateway Status:\n` +
         `- Runtime: Node.js (OpenClaw Clean Architecture)\n` +
         `- Assistant: OpenClaw AI Assistant\n` +
-        `- Active model: ${session.selectedModel || 'llama-3.3-70b-versatile'}\n` +
+        `- Active model: ${session.selectedModel || 'qwen/qwen3.8-27b'}\n` +
         `- Active sessions: ${activeCount}\n` +
         `- Memory compaction: enabled (4000 token ceiling)\n` +
         `- Proxy bypass: verified active\n\n` +
