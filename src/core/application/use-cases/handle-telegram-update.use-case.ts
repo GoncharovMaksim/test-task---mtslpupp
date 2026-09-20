@@ -66,6 +66,7 @@ export class HandleTelegramUpdateUseCase {
         `Send any text to interact with the assistant.\n\n` +
         `Commands:\n` +
         `/status - Inspect Gateway runtime and connection metrics\n` +
+        `/model  - Switch or inspect active AI model (Llama 3.3, Gemini, GPT OSS)\n` +
         `/soul   - Display active assistant persona guidelines\n` +
         `/reset  - Clear current conversation memory\n` +
         `/help   - Show operational guide`;
@@ -83,6 +84,7 @@ export class HandleTelegramUpdateUseCase {
         `- Continuous context is maintained across interactions.\n` +
         `- Token budget is automatically compacted via sliding window.\n` +
         `- No-VPN connectivity is routed through the Gateway proxy layer.\n` +
+        `- Use /model to switch between Llama 3.3 (70B), Gemini 2.0, GPT OSS, etc.\n` +
         `- Use /reset to begin a clean conversation session.`;
       await this.telegramAdapter.sendMessage({
         chatId,
@@ -103,6 +105,55 @@ export class HandleTelegramUpdateUseCase {
       return { handled: true, action: 'command_reset' };
     }
 
+    if (text === '/model' || text.startsWith('/model ')) {
+      const sessionId = `tg_${chatId}`;
+      const session = await this.sessionRepository.getOrCreate(sessionId, userId);
+      const arg = text.replace('/model', '').trim();
+
+      if (!arg) {
+        const current = session.selectedModel || 'llama-3.3-70b-versatile (по умолчанию)';
+        const modelListMsg =
+          `🤖 Текущая модель: ${current}\n\n` +
+          `Доступные модели для переключения:\n` +
+          `• /model llama-3.3-70b-versatile — Флагман Meta Llama 3.3 (70B, высокие лимиты токенов)\n` +
+          `• /model gemini-2.0-flash — Google Gemini 2.0 Flash (огромные лимиты)\n` +
+          `• /model llama-3.1-8b-instant — Сверхбыстрая Llama 8B\n` +
+          `• /model openai/gpt-oss-120b — Флагман OpenAI 120B на чипах Groq\n` +
+          `• /model qwen/qwen3.8-27b — Qwen 3.8 (лимит Groq 1000 OTPM)\n\n` +
+          `Для переключения скопируйте и отправьте команду с именем модели.`;
+
+        await this.telegramAdapter.sendMessage({
+          chatId,
+          text: modelListMsg,
+          replyToMessageId: message.message_id,
+        });
+        return { handled: true, action: 'command_model' };
+      }
+
+      let targetModel = arg;
+      if (arg === 'llama' || arg === 'llama-70b' || arg === '70b') {
+        targetModel = 'llama-3.3-70b-versatile';
+      } else if (arg === 'llama-8b' || arg === '8b') {
+        targetModel = 'llama-3.1-8b-instant';
+      } else if (arg === 'gemini' || arg === 'flash') {
+        targetModel = 'gemini-2.0-flash';
+      } else if (arg === 'qwen') {
+        targetModel = 'qwen/qwen3.8-27b';
+      } else if (arg === 'gpt' || arg === 'gpt-oss') {
+        targetModel = 'openai/gpt-oss-120b';
+      }
+
+      session.selectedModel = targetModel;
+      await this.sessionRepository.save(session);
+
+      await this.telegramAdapter.sendMessage({
+        chatId,
+        text: `✅ Модель переключена на: ${targetModel}`,
+        replyToMessageId: message.message_id,
+      });
+      return { handled: true, action: 'command_model_changed' };
+    }
+
     if (text === '/soul') {
       const soul = await this.soulRepository.getSoul();
       const summary =
@@ -119,15 +170,18 @@ export class HandleTelegramUpdateUseCase {
     }
 
     if (text === '/status') {
+      const sessionId = `tg_${chatId}`;
+      const session = await this.sessionRepository.getOrCreate(sessionId, userId);
       const activeCount = await this.sessionRepository.getActiveSessionCount();
       const statusText =
         `Gateway Status:\n` +
         `- Runtime: Node.js (OpenClaw Clean Architecture)\n` +
         `- Assistant: OpenClaw AI Assistant\n` +
+        `- Active model: ${session.selectedModel || 'llama-3.3-70b-versatile'}\n` +
         `- Active sessions: ${activeCount}\n` +
-        `- Memory compaction: enabled (8000 token ceiling)\n` +
-        `- Generation limit: 4096+ tokens (standard per model)\n` +
-        `- Proxy bypass: verified active`;
+        `- Memory compaction: enabled (4000 token ceiling)\n` +
+        `- Proxy bypass: verified active\n\n` +
+        `Переключение модели: /model`;
       await this.telegramAdapter.sendMessage({
         chatId,
         text: statusText,
@@ -139,11 +193,13 @@ export class HandleTelegramUpdateUseCase {
     // Natural language query processing
     try {
       const sessionId = `tg_${chatId}`;
+      const session = await this.sessionRepository.getOrCreate(sessionId, userId);
       const result = await this.processChatMessageUseCase.execute({
         sessionId,
         userId,
         content: text,
         channel: 'telegram',
+        model: session.selectedModel,
         metadata: {
           telegramChatId: chatId,
           telegramUserId: userId,

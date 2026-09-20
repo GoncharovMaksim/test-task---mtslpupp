@@ -6,6 +6,7 @@ export interface ChatSession {
   createdAt: number;
   updatedAt: number;
   userId?: string | number;
+  selectedModel?: string;
 }
 
 export class SessionEntity {
@@ -14,10 +15,12 @@ export class SessionEntity {
   public readonly createdAt: number;
   private _updatedAt: number;
   public readonly userId?: string | number;
+  public selectedModel?: string;
 
-  constructor(sessionId: string, userId?: string | number) {
+  constructor(sessionId: string, userId?: string | number, selectedModel?: string) {
     this.sessionId = sessionId;
     this.userId = userId;
+    this.selectedModel = selectedModel;
     this._messages = [];
     this.createdAt = Date.now();
     this._updatedAt = this.createdAt;

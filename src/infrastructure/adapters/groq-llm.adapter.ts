@@ -7,22 +7,22 @@ import {
 import { proxyFetch } from '../services/proxy-http-client';
 
 export function getStandardMaxTokensForModel(model?: string, configuredDefault?: number): number {
+  const m = (model || '').toLowerCase();
+  // Qwen on Groq on-demand tier has a hard limit of 1000 OTPM (output tokens per minute).
+  // We strictly cap Qwen at 500 tokens so requests do not trigger 429 OTPM exhaustion.
+  if (m.includes('qwen')) {
+    return Math.min(configuredDefault && configuredDefault > 0 ? configuredDefault : 500, 500);
+  }
   if (configuredDefault && configuredDefault > 0) {
     return configuredDefault;
   }
-  if (!model) {
+  if (m.includes('llama-3.1')) {
     return 2048;
   }
-  const m = model.toLowerCase();
-  // Safe limits respecting Groq rate limit budget (TPM) and model boundaries
-  if (m.includes('llama-3.3') || m.includes('deepseek')) {
-    return 2048;
+  if (m.includes('llama-3.3') || m.includes('deepseek') || m.includes('gpt-oss')) {
+    return 1500;
   }
-  if (m.includes('llama-3.1') || m.includes('gpt-oss')) {
-    return 2048;
-  }
-  // Qwen and standard default
-  return 2048;
+  return 1500;
 }
 
 export class GroqLLMAdapter implements ILLMProvider {
@@ -92,6 +92,48 @@ export class GroqLLMAdapter implements ILLMProvider {
 
       if (!response.ok) {
         const errorText = await response.text();
+        if (response.status === 429 && errorText.includes('output tokens per minute')) {
+          try {
+            const fallbackModel = model.toLowerCase().includes('qwen')
+              ? 'llama-3.3-70b-versatile'
+              : model;
+            const fallbackTokens = Math.min(resolvedMaxTokens, 350);
+            const retryPayload = {
+              ...payload,
+              model: fallbackModel,
+              max_tokens: fallbackTokens,
+            };
+            const retryResp = await proxyFetch(`${this.baseUrl}/chat/completions`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${this.apiKey}`,
+              },
+              body: JSON.stringify(retryPayload),
+              signal: controller.signal,
+              proxyUrl: this.proxyUrl,
+            });
+            if (retryResp.ok) {
+              const retryData = await retryResp.json();
+              const choice = retryData.choices?.[0];
+              return {
+                content: choice?.message?.content || '',
+                tokensUsed: retryData.usage
+                  ? {
+                      promptTokens: retryData.usage.prompt_tokens,
+                      completionTokens: retryData.usage.completion_tokens,
+                      totalTokens: retryData.usage.total_tokens,
+                    }
+                  : undefined,
+                latencyMs: Date.now() - startTime,
+                model: fallbackModel,
+                provider: this.providerName,
+              };
+            }
+          } catch {
+            // fallback attempt failed, proceed to throw original error
+          }
+        }
         throw new Error(`Groq API returned ${response.status}: ${errorText}`);
       }
 
